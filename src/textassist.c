@@ -812,9 +812,6 @@ static bool insert_tag(HWND hwnd)
     AppendMenuW(h, MF_ENABLED | MF_STRING, 4, L"表示速度 <r1> ～ <r>");
   }
 
-  if (caret_start == caret_end)
-  {
-  }
   int id = TrackPopupMenu(h, TPM_TOPALIGN | TPM_LEFTALIGN | TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
   DestroyMenu(h);
   if (!id)
