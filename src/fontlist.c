@@ -418,6 +418,9 @@ bool font_list_create(struct font_list *fl)
 
 void font_list_destroy(struct font_list *fl)
 {
+  if (!fl) {
+    return;
+  }
   if (fl->sorted)
   {
     free(fl->sorted);
@@ -428,6 +431,10 @@ void font_list_destroy(struct font_list *fl)
 
 int font_list_index_of(struct font_list *fl, PCWSTR s)
 {
+  if (!fl || !s) {
+    ods(L"invalid parameter");
+    return -1;
+  }
   for (int i = 0, c; i < fl->num; ++i)
   {
     c = lstrcmpW(s, fl->sorted[i]);
