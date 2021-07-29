@@ -268,6 +268,17 @@ static void extended_normalize(PWSTR str)
   }
 }
 
+static bool my_realloc(void *p, size_t newsize)
+{
+  void *np = realloc(*(void **)p, newsize);
+  if (!np)
+  {
+    return false;
+  }
+  *(void **)p = np;
+  return true;
+}
+
 static int CALLBACK enum_font_callback(const LOGFONTW *lf, const TEXTMETRICW *tm, DWORD fontType, LPARAM lParam)
 {
   (void)tm;
@@ -284,6 +295,7 @@ static int CALLBACK enum_font_callback(const LOGFONTW *lf, const TEXTMETRICW *tm
     {
       if (lstrcmpW(fd->buf + (int)fd->list[i], facename) == 0)
       {
+        // already enumerated
         return TRUE;
       }
     }
@@ -291,21 +303,39 @@ static int CALLBACK enum_font_callback(const LOGFONTW *lf, const TEXTMETRICW *tm
 
   const int namelen = lstrlenW(facename);
   int namelen2 = NormalizeString(NormalizationKC, facename, namelen, NULL, 0);
+  if (namelen2 <= 0)
+  {
+    odshr(HRESULT_FROM_WIN32(GetLastError()), L"failed to get normalized font name length: %s", facename);
+    return TRUE;
+  }
   if (fd->pos + namelen + 1 + namelen2 + 1 > fd->len)
   {
     fd->len += BUFFER_SIZE;
-    fd->buf = realloc(fd->buf, fd->len * sizeof(WCHAR));
+    if (!my_realloc(&fd->buf, fd->len * sizeof(WCHAR)))
+    {
+      ods(L"failed to expand font list buffer");
+      return FALSE;
+    }
   }
   memcpy(fd->buf + fd->pos, facename, namelen * sizeof(WCHAR));
   fd->buf[fd->pos + namelen] = L'\0';
   namelen2 = NormalizeString(NormalizationKC, facename, namelen, fd->buf + fd->pos + namelen + 1, namelen2 + 1);
+  if (namelen2 <= 0)
+  {
+    odshr(HRESULT_FROM_WIN32(GetLastError()), L"failed to get normalized font name: %s", facename);
+    return TRUE;
+  }
   fd->buf[fd->pos + namelen + 1 + namelen2] = L'\0';
   extended_normalize(fd->buf + fd->pos + namelen + 1);
 
   if (fd->n == fd->listlen)
   {
     fd->listlen += BUFFER_SIZE;
-    fd->list = realloc(fd->list, fd->listlen * sizeof(PCWSTR));
+    if (!my_realloc(&fd->list, fd->listlen * sizeof(PCWSTR)))
+    {
+      ods(L"failed to expand normalized font list buffer");
+      return FALSE;
+    }
   }
   // Since the address may change depending on realloc,
   // at this point we record only the position.
@@ -327,6 +357,12 @@ bool font_list_create(struct font_list *fl)
 {
   HWND window = GetDesktopWindow();
   HDC dc = GetDC(window);
+  if (!dc)
+  {
+    ods(L"GetDC failed");
+    return false;
+  }
+
   struct enum_font_data fd = {0};
 
   // We should use EnumFontFamiliesExW but some fonts are not enumerate when using it.
@@ -334,7 +370,15 @@ bool font_list_create(struct font_list *fl)
   // LOGFONTW lf = { 0 };
   // lf.lfCharSet = DEFAULT_CHARSET;
   // EnumFontFamiliesExW(dc, &lf, enum_font_callback, (LPARAM)&fd, 0);
-  EnumFontFamiliesW(dc, NULL, enum_font_callback, (LPARAM)&fd);
+  if (!EnumFontFamiliesW(dc, NULL, enum_font_callback, (LPARAM)&fd))
+  {
+    free(fd.list);
+    free(fd.buf);
+    ReleaseDC(window, dc);
+    return false;
+  }
+
+  ReleaseDC(window, dc);
 
   // Create sorted font list.
 
@@ -345,8 +389,15 @@ bool font_list_create(struct font_list *fl)
   }
   qsort(fd.list, fd.n, sizeof(PCWSTR), compare_string);
 
-  PZPCWSTR r = realloc(NULL, (fd.n + 1) * sizeof(PCWSTR) + fd.pos * sizeof(WCHAR));
-  PWSTR str = (void *)(r + fd.n + 1);
+  PZPCWSTR r = realloc(NULL, fd.n * sizeof(PCWSTR) + fd.pos * sizeof(WCHAR));
+  if (!r)
+  {
+    ods(L"failed to allocate sorted font list buffer");
+    free(fd.list);
+    free(fd.buf);
+    return false;
+  }
+  PWSTR str = (void *)(r + fd.n);
   int ln, ln2;
   for (int i = 0; i < fd.n; ++i)
   {
@@ -356,11 +407,9 @@ bool font_list_create(struct font_list *fl)
     memcpy(str, fd.list[i], (ln + ln2) * sizeof(WCHAR));
     str += (ln + ln2);
   }
-  r[fd.n] = NULL;
 
   free(fd.list);
   free(fd.buf);
-  ReleaseDC(window, dc);
 
   fl->sorted = r;
   fl->num = fd.n;
@@ -374,6 +423,7 @@ void font_list_destroy(struct font_list *fl)
     free(fl->sorted);
     fl->sorted = NULL;
   }
+  fl->num = 0;
 }
 
 int font_list_index_of(struct font_list *fl, PCWSTR s)
@@ -448,7 +498,10 @@ static int diff_distance(struct diff *d)
   if (d->fpbuflen < fplen)
   {
     d->fpbuflen = fplen;
-    d->fpbuf = realloc(d->fpbuf, d->fpbuflen * sizeof(int));
+    if (!my_realloc(&d->fpbuf, d->fpbuflen * sizeof(int)))
+    {
+      return -1;
+    }
   }
   int *fp = d->fpbuf;
   for (int i = 0; i < fplen; ++i)
@@ -478,38 +531,90 @@ static int diff_distance(struct diff *d)
 
 static int compare_distance(const void *n1, const void *n2)
 {
-  float f1 = ((struct font_similar *)n1)->score;
-  float f2 = ((struct font_similar *)n2)->score;
-  return f1 == f2 ? 0 : f1 > f2 ? 1
-                                : -1;
+  const int x = ((struct font_similar *)n1)->score;
+  const int y = ((struct font_similar *)n2)->score;
+  return x == y ? 0 : x > y ? 1
+                            : -1;
 }
 
 struct font_similar *font_get_similar(struct font_list *fl, PCWSTR s)
 {
+  if (!fl || !s || !fl->num || !fl->sorted)
+  {
+    return NULL;
+  }
+  struct diff diff = {0};
+  struct font_similar *sim = NULL;
+
   // make normalized input
-  int slen = lstrlenW(s);
+  const int slen = lstrlenW(s);
   int snlen = NormalizeString(NormalizationKC, s, slen, NULL, 0);
+  if (snlen <= 0)
+  {
+    odshr(HRESULT_FROM_WIN32(GetLastError()), L"NormalizeString failed");
+    return NULL;
+  }
+
   PWSTR sn = realloc(NULL, (snlen + 1) * sizeof(WCHAR));
+  if (!sn)
+  {
+    ods(L"failed to allocate memory");
+    goto cleanup;
+  }
   snlen = NormalizeString(NormalizationKC, s, slen, sn, snlen);
+  if (snlen <= 0)
+  {
+    odshr(HRESULT_FROM_WIN32(GetLastError()), L"NormalizeString failed");
+    goto cleanup;
+  }
   sn[snlen] = L'\0';
+  odshr(HRESULT_FROM_WIN32(GetLastError()), L"Normalize Input");
   extended_normalize(sn);
 
-  struct diff diff = {0};
   diff.fpbuflen = 128;
   diff.fpbuf = realloc(NULL, diff.fpbuflen * sizeof(int));
+  if (!diff.fpbuf)
+  {
+    ods(L"failed to allocate memory");
+    goto cleanup;
+  }
 
-  struct font_similar *sim = realloc(NULL, fl->num * sizeof(struct font_similar));
+  sim = realloc(NULL, fl->num * sizeof(struct font_similar));
+  if (!sim)
+  {
+    ods(L"failed to allocate memory");
+    goto cleanup;
+  }
   for (int i = 0; i < fl->num; ++i)
   {
     diff_init(&diff, sn, fl->sorted[i] + lstrlenW(fl->sorted[i]) + 1);
     sim[i].idx = i;
     sim[i].score = diff_distance(&diff);
+    if (sim[i].score == -1)
+    {
+      goto cleanup;
+    }
   }
   qsort(sim, fl->num, sizeof(struct font_similar), compare_distance);
-
   free(diff.fpbuf);
-  diff.fpbuf = NULL;
-  diff.fpbuflen = 0;
   free(sn);
   return sim;
+
+cleanup:
+  if (diff.fpbuf)
+  {
+    free(diff.fpbuf);
+    diff.fpbuf = NULL;
+  }
+  if (sim)
+  {
+    free(sim);
+    sim = NULL;
+  }
+  if (sn)
+  {
+    free(sn);
+    sn = NULL;
+  }
+  return NULL;
 }
