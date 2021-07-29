@@ -568,7 +568,6 @@ struct font_similar *font_get_similar(struct font_list *fl, PCWSTR s)
     goto failed;
   }
   sn[snlen] = L'\0';
-  odshr(HRESULT_FROM_WIN32(GetLastError()), L"Normalize Input");
   extended_normalize(sn);
 
   diff.fpbuflen = 128;
