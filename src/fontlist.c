@@ -541,6 +541,7 @@ struct font_similar *font_get_similar(struct font_list *fl, PCWSTR s)
 {
   if (!fl || !s || !fl->num || !fl->sorted)
   {
+    ods(L"invalid parameter");
     return NULL;
   }
   struct diff diff = {0};
@@ -591,6 +592,7 @@ struct font_similar *font_get_similar(struct font_list *fl, PCWSTR s)
     sim[i].score = diff_distance(&diff);
     if (sim[i].score == -1)
     {
+      ods(L"failed to expand temporary buffer");
       goto failed;
     }
   }
