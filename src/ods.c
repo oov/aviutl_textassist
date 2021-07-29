@@ -2,7 +2,7 @@
 
 #include <stdarg.h>
 
-void ODS(PCWSTR fmt, ...)
+void ods(PCWSTR fmt, ...)
 {
   WCHAR s[1024], f[1024];
   va_list p;

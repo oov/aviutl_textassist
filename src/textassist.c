@@ -948,7 +948,7 @@ static bool support_input(HWND hwnd, WPARAM keyCode)
     }
   }
 
-  // ODS("tag type:%d pos:%d len:%d v0:%d %d v1:%d %d v2:%d %d", tag.type, tag.pos, tag.len, tag.value_pos[0], tag.value_len[0], tag.value_pos[1], tag.value_len[1], tag.value_pos[2], tag.value_len[2]);
+  // ods("tag type:%d pos:%d len:%d v0:%d %d v1:%d %d v2:%d %d", tag.type, tag.pos, tag.len, tag.value_pos[0], tag.value_len[0], tag.value_pos[1], tag.value_len[1], tag.value_pos[2], tag.value_len[2]);
 
   if (!increment_tag(hwnd, &tag, caret_start, keyCode))
   {
@@ -1051,7 +1051,7 @@ static void initialize(HWND hwnd, void *editp, FILTER *fp)
   (void)fp;
 
   if (!font_list_create(&font_name_list)) {
-    ODS(L"failed to initialize font list");
+    ods(L"failed to initialize font list");
   }
 
   g_exedit_window = FindWindowW(L"ExtendedFilterClass", NULL);
