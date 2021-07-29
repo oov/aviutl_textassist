@@ -559,13 +559,13 @@ struct font_similar *font_get_similar(struct font_list *fl, PCWSTR s)
   if (!sn)
   {
     ods(L"failed to allocate memory");
-    goto cleanup;
+    goto failed;
   }
   snlen = NormalizeString(NormalizationKC, s, slen, sn, snlen);
   if (snlen <= 0)
   {
     odshr(HRESULT_FROM_WIN32(GetLastError()), L"NormalizeString failed");
-    goto cleanup;
+    goto failed;
   }
   sn[snlen] = L'\0';
   odshr(HRESULT_FROM_WIN32(GetLastError()), L"Normalize Input");
@@ -576,14 +576,14 @@ struct font_similar *font_get_similar(struct font_list *fl, PCWSTR s)
   if (!diff.fpbuf)
   {
     ods(L"failed to allocate memory");
-    goto cleanup;
+    goto failed;
   }
 
   sim = realloc(NULL, fl->num * sizeof(struct font_similar));
   if (!sim)
   {
     ods(L"failed to allocate memory");
-    goto cleanup;
+    goto failed;
   }
   for (int i = 0; i < fl->num; ++i)
   {
@@ -592,7 +592,7 @@ struct font_similar *font_get_similar(struct font_list *fl, PCWSTR s)
     sim[i].score = diff_distance(&diff);
     if (sim[i].score == -1)
     {
-      goto cleanup;
+      goto failed;
     }
   }
   qsort(sim, fl->num, sizeof(struct font_similar), compare_distance);
@@ -600,7 +600,7 @@ struct font_similar *font_get_similar(struct font_list *fl, PCWSTR s)
   free(sn);
   return sim;
 
-cleanup:
+failed:
   if (diff.fpbuf)
   {
     free(diff.fpbuf);
