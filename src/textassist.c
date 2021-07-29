@@ -499,7 +499,7 @@ static bool increment_tag_position(struct tag *tag, const int pos, const int key
   return true;
 }
 
-static struct font_list *font_name_list = NULL;
+static struct font_list font_name_list = { 0 };
 
 static PCWSTR choice_similar_font(struct font_list *fl, HWND hwnd, PCWSTR s)
 {
@@ -540,7 +540,7 @@ static bool increment_tag_font(HWND hwnd, struct tag *tag, const int pos, const 
   }
   else if (tag->value_pos[1] != -1 && tag->value_pos[1] <= pos && pos <= tag->value_pos[1] + tag->value_len[1])
   {
-    int idx = font_list_index_of(font_name_list, tag->value.font.name);
+    int idx = font_list_index_of(&font_name_list, tag->value.font.name);
     if (idx != -1)
     {
       const int v = choice_by_arrowi(keyCode, -10, 10, -1, 1);
@@ -548,11 +548,11 @@ static bool increment_tag_font(HWND hwnd, struct tag *tag, const int pos, const 
       {
         return false;
       }
-      lstrcpyW(tag->value.font.name, font_name_list->sorted[saturatei(idx + v, 0, font_name_list->num)]);
+      lstrcpyW(tag->value.font.name, font_name_list.sorted[saturatei(idx + v, 0, font_name_list.num)]);
       return true;
     }
 
-    PCWSTR s = choice_similar_font(font_name_list, hwnd, tag->value.font.name);
+    PCWSTR s = choice_similar_font(&font_name_list, hwnd, tag->value.font.name);
     if (!s)
     {
       return false;
@@ -1050,7 +1050,9 @@ static void initialize(HWND hwnd, void *editp, FILTER *fp)
   (void)editp;
   (void)fp;
 
-  font_name_list = font_list_create();
+  if (!font_list_create(&font_name_list)) {
+    ODS(L"failed to initialize font list");
+  }
 
   g_exedit_window = FindWindowW(L"ExtendedFilterClass", NULL);
   if (!g_exedit_window)
@@ -1082,11 +1084,7 @@ static void finalize(HWND hwnd, void *editp, FILTER *fp)
   }
   g_exedit_window = NULL;
 
-  if (font_name_list)
-  {
-    font_list_destroy(font_name_list);
-    font_name_list = NULL;
-  }
+  font_list_destroy(&font_name_list);
 }
 
 BOOL textassist_wndproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, void *editp, FILTER *fp)

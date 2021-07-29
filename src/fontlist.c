@@ -2,7 +2,6 @@
 
 #include "ods.h"
 #include <stdlib.h>
-#include <stdbool.h>
 
 enum
 {
@@ -324,7 +323,7 @@ static int compare_string(const void *n1, const void *n2)
   return lstrcmpW(*(PCWSTR *)n1, *(PCWSTR *)n2);
 }
 
-struct font_list *font_list_create(void)
+bool font_list_create(struct font_list *fl)
 {
   HWND window = GetDesktopWindow();
   HDC dc = GetDC(window);
@@ -363,10 +362,9 @@ struct font_list *font_list_create(void)
   free(fd.buf);
   ReleaseDC(window, dc);
 
-  struct font_list *fl = realloc(NULL, sizeof(struct font_list));
   fl->sorted = r;
   fl->num = fd.n;
-  return fl;
+  return true;
 }
 
 void font_list_destroy(struct font_list *fl)
@@ -376,7 +374,6 @@ void font_list_destroy(struct font_list *fl)
     free(fl->sorted);
     fl->sorted = NULL;
   }
-  free(fl);
 }
 
 int font_list_index_of(struct font_list *fl, PCWSTR s)
