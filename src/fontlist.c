@@ -431,7 +431,7 @@ void font_list_destroy(struct font_list *fl)
 
 int font_list_index_of(struct font_list *fl, PCWSTR s)
 {
-  if (!fl || !s) {
+  if (!fl || !s || !fl->sorted) {
     ods(L"invalid parameter");
     return -1;
   }

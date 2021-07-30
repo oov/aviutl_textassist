@@ -503,27 +503,45 @@ static struct font_list font_name_list = { 0 };
 
 static PCWSTR choice_similar_font(struct font_list *fl, HWND hwnd, PCWSTR s)
 {
-  PCWSTR ret = NULL;
   DWORD caret_start = 0, caret_end = 0;
   SendMessageW(hwnd, EM_GETSEL, (WPARAM)&caret_start, (LPARAM)&caret_end);
   DWORD r = SendMessageW(hwnd, EM_POSFROMCHAR, (WPARAM)caret_start, 0);
   POINT pt = {LOWORD(r), HIWORD(r)};
-  ClientToScreen(hwnd, &pt);
+  if (!ClientToScreen(hwnd, &pt)) {
+    ods(L"ClientToScreen failed");
+    return NULL;
+  }
 
-  HMENU h = CreatePopupMenu();
   struct font_similar *similar = font_get_similar(fl, s);
+  if (!similar) {
+    ods(L"failed to get a list of similar font names");
+    return NULL;
+  }
+  HMENU h = CreatePopupMenu();
+  if (!h) {
+    odshr(HRESULT_FROM_WIN32(GetLastError()), L"CreatePopupMenu failed");
+    goto failed;
+  }
   for (int i = 0; i < fl->num && i < 10; ++i)
   {
-    AppendMenuW(h, MF_ENABLED | MF_STRING, i + 1, fl->sorted[similar[i].idx]);
+    if (!AppendMenuW(h, MF_ENABLED | MF_STRING, i + 1, fl->sorted[similar[i].idx])) {
+      odshr(HRESULT_FROM_WIN32(GetLastError()), L"AppendMenu failed");
+      goto failed;
+    }
   }
-  int id = TrackPopupMenu(h, TPM_TOPALIGN | TPM_LEFTALIGN | TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+  const int id = TrackPopupMenu(h, TPM_TOPALIGN | TPM_LEFTALIGN | TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
   DestroyMenu(h);
-  if (id)
-  {
-    ret = fl->sorted[similar[id - 1].idx];
-  }
+
+  PCWSTR ret = id ? fl->sorted[similar[id - 1].idx] : NULL;
   free(similar);
   return ret;
+
+failed:
+  if (similar) {
+    free(similar);
+  }
+  DestroyMenu(h);
+  return NULL;
 }
 
 static bool increment_tag_font(HWND hwnd, struct tag *tag, const int pos, const int keyCode)
@@ -766,7 +784,7 @@ static int sprint_tag(PWSTR buf, struct tag *tag)
   return -1;
 }
 
-static PWSTR get_text_from_window(HWND hwnd)
+static PWSTR get_text_from_window(HWND hwnd, int *length)
 {
   const DWORD len = GetWindowTextLengthW(hwnd);
   if (!len)
@@ -776,14 +794,17 @@ static PWSTR get_text_from_window(HWND hwnd)
   PWSTR str = realloc(NULL, sizeof(WCHAR) * (len + 1));
   if (!str)
   {
+    ods(L"failed to allocate text buffer");
     return NULL;
   }
   if (GetWindowTextW(hwnd, str, len + 1) == 0)
   {
+    odshr(HRESULT_FROM_WIN32(GetLastError()), L"GetWindowText failed");
     free(str);
     return NULL;
   }
   str[len] = L'\0';
+  *length = len;
   return str;
 }
 
@@ -793,9 +814,16 @@ static bool insert_tag(HWND hwnd)
   SendMessageW(hwnd, EM_GETSEL, (WPARAM)&caret_start, (LPARAM)&caret_end);
   DWORD r = SendMessageW(hwnd, EM_POSFROMCHAR, (WPARAM)caret_start, 0);
   POINT pt = {LOWORD(r), HIWORD(r)};
-  ClientToScreen(hwnd, &pt);
+  if (!ClientToScreen(hwnd, &pt)) {
+    odshr(HRESULT_FROM_WIN32(GetLastError()), L"ClientToScreen failed");
+    return false;
+  }
 
   HMENU h = CreatePopupMenu();
+  if (!h) {
+    odshr(HRESULT_FROM_WIN32(GetLastError()), L"CreatePopupMenu failed");
+    return false;
+  }
   if (caret_start == caret_end)
   {
     AppendMenuW(h, MF_ENABLED | MF_STRING, 1, L"色の変更 <#000000,ffffff>");
@@ -854,8 +882,11 @@ static bool insert_tag(HWND hwnd)
   default:
     return false;
   }
-  PWSTR str = get_text_from_window(hwnd);
-  int len = lstrlenW(str);
+  int len = 0;
+  PWSTR str = get_text_from_window(hwnd, &len);
+  if (!str) {
+    return false;
+  }
   PWSTR str2 = realloc(NULL, (len + 64) * sizeof(WCHAR));
   int pos = 0, l;
 
@@ -908,14 +939,13 @@ static bool support_input(HWND hwnd, WPARAM keyCode)
     return false; // do nothing if text is selected
   }
 
-  PWSTR str = get_text_from_window(hwnd);
+  int len = 0;
+  PWSTR str = get_text_from_window(hwnd, &len);
   PWSTR str2 = NULL;
   if (!str)
   {
     return false;
   }
-
-  const DWORD len = lstrlenW(str);
 
   struct tag tag = {0};
   // find tags, left side first
@@ -957,6 +987,10 @@ static bool support_input(HWND hwnd, WPARAM keyCode)
 
   // 256 is large enough to store generated tag.
   str2 = realloc(NULL, sizeof(WCHAR) * (len - tag.len + 256));
+  if (!str2) {
+    ods(L"failed to allocate modified text buffer");
+    goto failed;
+  }
   memcpy(str2, str, tag.pos * sizeof(WCHAR));
   const int newlen = sprint_tag(str2 + tag.pos, &tag);
   if (newlen == -1)
@@ -964,7 +998,10 @@ static bool support_input(HWND hwnd, WPARAM keyCode)
     goto failed;
   }
   memcpy(str2 + tag.pos + newlen, str + tag.pos + tag.len, (len - tag.pos - tag.len + 1) * sizeof(WCHAR));
-  SetWindowTextW(hwnd, str2);
+  if (!SetWindowTextW(hwnd, str2)) {
+    odshr(HRESULT_FROM_WIN32(GetLastError()), L"SetWindowText failed");
+    goto failed;
+  }
   const int pos = tag.type != tag_type_color && tag.len != newlen ? tag.pos + saturatei(newlen - 1, 0, INT_MAX) : (int)caret_start;
   SendMessageW(hwnd, EM_SETSEL, (WPARAM)pos, (LPARAM)pos);
   free(str);
