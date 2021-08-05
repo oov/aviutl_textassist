@@ -21,8 +21,7 @@ enum
 
 struct tag_color
 {
-  uint32_t color1;
-  uint32_t color2;
+  uint32_t color[2];
 };
 
 struct tag_position
@@ -249,8 +248,8 @@ static bool parse_tag(PCWSTR str, const int len, const int pos, struct tag *tag)
       switch (type)
       {
       case tag_type_color:
-        tag->value.color.color1 = tag->value_len[0] == 0 ? 0 : wcstol(str + tag->value_pos[0], NULL, 16);
-        tag->value.color.color2 = tag->value_len[1] == 0 ? 0 : wcstol(str + tag->value_pos[1], NULL, 16);
+        tag->value.color.color[0] = tag->value_len[0] == 0 ? 0 : wcstol(str + tag->value_pos[0], NULL, 16);
+        tag->value.color.color[1] = tag->value_len[1] == 0 ? 0 : wcstol(str + tag->value_pos[1], NULL, 16);
         break;
       case tag_type_position:
         tag->value.position.x = tag->value_len[0] == 0 ? 0 : wcstof(str + tag->value_pos[0], NULL);
@@ -368,6 +367,16 @@ static bool parse_tag(PCWSTR str, const int len, const int pos, struct tag *tag)
   return false;
 }
 
+static int get_caret_tag_value_index(const struct tag *tag, const int pos) {
+  for (int i = 0; i < 3; ++i) {
+    if (tag->value_pos[i] != -1 && tag->value_pos[i] <= pos && pos <= tag->value_pos[i] + tag->value_len[i])
+    {
+      return i;
+    }
+  }
+  return -1;
+}
+
 static bool find_tag(PCWSTR str, int len, int pos, struct tag *tag)
 {
   int tag_pos = find_char_reverse(str, pos, L'<');
@@ -420,52 +429,33 @@ static bool increment_tag_color(struct tag *tag, const int pos, const int keyCod
   {
     return false;
   }
-  int r1 = (tag->value.color.color1 >> 16) & 0xff;
-  int g1 = (tag->value.color.color1 >> 8) & 0xff;
-  int b1 = (tag->value.color.color1 >> 0) & 0xff;
-  int r2 = (tag->value.color.color2 >> 16) & 0xff;
-  int g2 = (tag->value.color.color2 >> 8) & 0xff;
-  int b2 = (tag->value.color.color2 >> 0) & 0xff;
-  if (tag->value_pos[0] != -1 && tag->value_pos[0] <= pos && pos <= tag->value_pos[0] + tag->value_len[0])
-  {
-    switch (pos - tag->value_pos[0])
-    {
-    case 0:
-    case 1:
-      r1 = saturatei(r1 + v, 0, 255);
-      break;
-    case 3:
-      g1 = saturatei(g1 + v, 0, 255);
-      break;
-    case 5:
-    case 6:
-      b1 = saturatei(b1 + v, 0, 255);
-      break;
-    }
-  }
-  else if (tag->value_pos[1] != -1 && tag->value_pos[1] <= pos && pos <= tag->value_pos[1] + tag->value_len[1])
-  {
-    switch (pos - tag->value_pos[1])
-    {
-    case 0:
-    case 1:
-      r2 = saturatei(r2 + v, 0, 255);
-      break;
-    case 3:
-      g2 = saturatei(g2 + v, 0, 255);
-      break;
-    case 5:
-    case 6:
-      b2 = saturatei(b2 + v, 0, 255);
-      break;
-    }
-  }
-  else
-  {
+  const int idx = get_caret_tag_value_index(tag, pos);
+  if (idx != 0 && idx != 1) {
     return false;
   }
-  tag->value.color.color1 = (r1 << 16) | (g1 << 8) | b1;
-  tag->value.color.color2 = (r2 << 16) | (g2 << 8) | b2;
+  int r[2] = {0}, g[2] = {0}, b[2] = {0};
+  for(int i = 0; i < 2; ++i) {
+    r[i] = (tag->value.color.color[i] >> 16) & 0xff;
+    g[i] = (tag->value.color.color[i] >> 8) & 0xff;
+    b[i] = (tag->value.color.color[i] >> 0) & 0xff;
+  }
+  switch (pos - tag->value_pos[idx])
+  {
+  case 0:
+  case 1:
+    r[idx] = saturatei(r[idx] + v, 0, 255);
+    break;
+  case 3:
+    g[idx] = saturatei(g[idx] + v, 0, 255);
+    break;
+  case 5:
+  case 6:
+    b[idx] = saturatei(b[idx] + v, 0, 255);
+    break;
+  }
+  for(int i = 0; i < 2; ++i) {
+    tag->value.color.color[i] = (r[i] << 16) | (g[i] << 8) | b[i];
+  }
   return true;
 }
 
@@ -540,58 +530,64 @@ failed:
 
 static bool increment_tag_font(HWND hwnd, struct tag *tag, const int pos, const int keyCode)
 {
-  if (tag->value_pos[0] != -1 && tag->value_pos[0] <= pos && pos <= tag->value_pos[0] + tag->value_len[0])
-  {
-    const int v = choice_by_arrow_up_downi(keyCode, 1, -1, 10, -10);
-    if (!v)
-    {
-      return false;
-    }
-    tag->value.font.size = saturatei(tag->value.font.size + v, 0, INT_MAX);
-    return true;
-  }
-  else if (tag->value_pos[1] != -1 && tag->value_pos[1] <= pos && pos <= tag->value_pos[1] + tag->value_len[1])
-  {
-    int idx = font_list_index_of(&font_name_list, tag->value.font.name);
-    if (idx != -1)
+  const int idx = get_caret_tag_value_index(tag, pos);
+  switch (idx) {
+  case 0:
     {
       const int v = choice_by_arrow_up_downi(keyCode, 1, -1, 10, -10);
       if (!v)
       {
         return false;
       }
-      lstrcpyW(tag->value.font.name, font_name_list.sorted[saturatei(idx + v, 0, font_name_list.num)]);
+      tag->value.font.size = saturatei(tag->value.font.size + v, 0, INT_MAX);
       return true;
     }
+    break;
+  case 1:
+    {
+      const int fidx = font_list_index_of(&font_name_list, tag->value.font.name);
+      if (fidx != -1)
+      {
+        const int v = choice_by_arrow_up_downi(keyCode, 1, -1, 10, -10);
+        if (!v)
+        {
+          return false;
+        }
+        lstrcpyW(tag->value.font.name, font_name_list.sorted[saturatei(fidx + v, 0, font_name_list.num)]);
+        return true;
+      }
 
-    PCWSTR s = choice_similar_font(&font_name_list, hwnd, tag->value.font.name);
-    if (!s)
-    {
-      return false;
+      PCWSTR s = choice_similar_font(&font_name_list, hwnd, tag->value.font.name);
+      if (!s)
+      {
+        return false;
+      }
+      lstrcpyW(tag->value.font.name, s);
+      return true;
     }
-    lstrcpyW(tag->value.font.name, s);
-    return true;
-  }
-  else if (tag->value_pos[2] != -1 && tag->value_pos[2] <= pos && pos <= tag->value_pos[2] + tag->value_len[2])
-  {
-    int style = 0;
-    if (tag->value.font.bold)
+    break;
+  case 2:
     {
-      style |= 1;
+      const int v = choice_by_arrow_up_downi(keyCode, 1, -1, 1, -1);
+      if (!v)
+      {
+        return false;
+      }
+      int style = 0;
+      if (tag->value.font.bold)
+      {
+        style |= 1;
+      }
+      if (tag->value.font.italic)
+      {
+        style |= 2;
+      }
+      style += v;
+      tag->value.font.bold = style & 1;
+      tag->value.font.italic = style & 2;
+      return true;
     }
-    if (tag->value.font.italic)
-    {
-      style |= 2;
-    }
-    const int v = choice_by_arrow_up_downi(keyCode, 1, -1, 1, -1);
-    if (!v)
-    {
-      return false;
-    }
-    style += v;
-    tag->value.font.bold = style & 1;
-    tag->value.font.italic = style & 2;
-    return true;
+    break;
   }
   return false;
 }
@@ -654,23 +650,22 @@ static bool increment_tag(HWND hwnd, struct tag *tag, const int pos, const int k
 
 static int sprint_tag_color(PWSTR buf, struct tag *tag)
 {
-  WCHAR color1[8] = {L'\0'};
-  WCHAR color2[8] = {L'\0'};
+  WCHAR color[2][8] = {{L'\0'}, {L'\0'}};
   if (tag->value_len[0] == 6)
   {
-    wsprintfW(color1, L"%06x", tag->value.color.color1);
+    wsprintfW(color[0], L"%06x", tag->value.color.color[0]);
   }
   if (tag->value_len[1] == 6)
   {
-    wsprintfW(color2, L"%06x", tag->value.color.color2);
+    wsprintfW(color[1], L"%06x", tag->value.color.color[1]);
   }
   if (tag->value_pos[1] != -1)
   {
-    return wsprintfW(buf, L"<#%s,%s>", color1, color2);
+    return wsprintfW(buf, L"<#%s,%s>", color[0], color[1]);
   }
   if (tag->value_pos[0] != -1)
   {
-    return wsprintfW(buf, L"<#%s>", color1);
+    return wsprintfW(buf, L"<#%s>", color[0]);
   }
   return wsprintfW(buf, L"<#>");
 }

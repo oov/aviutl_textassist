@@ -19,10 +19,6 @@ EOS
 #   pacman -S mingw-w64-i686-ninja
 #   pacman -S mingw-w64-i686-clang
 #   pacman -S mingw-w64-i686-cmake
-# mkdir build
-# cd build
-# CC=clang cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
-# ninja
 
 mkdir -p build
 rm -rf build/*
