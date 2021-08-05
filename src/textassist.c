@@ -387,41 +387,35 @@ static bool find_tag(PCWSTR str, int len, int pos, struct tag *tag)
   return true;
 }
 
-static inline int choice_by_arrowi(const int keyCode, const int left, const int right, const int up, const int down)
+static inline int choice_by_arrow_up_downi(const int keyCode, const int up, const int down, const int shift_up, const int shift_down)
 {
+  const bool shift = GetKeyState(VK_SHIFT) < 0;
   switch (keyCode)
   {
-  case VK_LEFT:
-    return left;
-  case VK_RIGHT:
-    return right;
   case VK_UP:
-    return up;
+    return shift ? shift_up : up;
   case VK_DOWN:
-    return down;
+    return shift ? shift_down : down;
   }
   return 0;
 }
 
-static inline float choice_by_arrowf(const int keyCode, const float left, const float right, const float up, const float down)
+static inline float choice_by_arrow_up_downf(const int keyCode, const float up, const float down, const float shift_up, const float shift_down)
 {
+  const bool shift = GetKeyState(VK_SHIFT) < 0;
   switch (keyCode)
   {
-  case VK_LEFT:
-    return left;
-  case VK_RIGHT:
-    return right;
   case VK_UP:
-    return up;
+    return shift ? shift_up : up;
   case VK_DOWN:
-    return down;
+    return shift ? shift_down : down;
   }
   return 0.f;
 }
 
 static bool increment_tag_color(struct tag *tag, const int pos, const int keyCode)
 {
-  const int v = choice_by_arrowi(keyCode, -16, 16, 1, -1);
+  const int v = choice_by_arrow_up_downi(keyCode, 1, -1, 16, -16);
   if (!v)
   {
     return false;
@@ -548,7 +542,7 @@ static bool increment_tag_font(HWND hwnd, struct tag *tag, const int pos, const 
 {
   if (tag->value_pos[0] != -1 && tag->value_pos[0] <= pos && pos <= tag->value_pos[0] + tag->value_len[0])
   {
-    const int v = choice_by_arrowi(keyCode, -10, 10, 1, -1);
+    const int v = choice_by_arrow_up_downi(keyCode, 1, -1, 10, -10);
     if (!v)
     {
       return false;
@@ -561,7 +555,7 @@ static bool increment_tag_font(HWND hwnd, struct tag *tag, const int pos, const 
     int idx = font_list_index_of(&font_name_list, tag->value.font.name);
     if (idx != -1)
     {
-      const int v = choice_by_arrowi(keyCode, -10, 10, -1, 1);
+      const int v = choice_by_arrow_up_downi(keyCode, 1, -1, 10, -10);
       if (!v)
       {
         return false;
@@ -589,7 +583,7 @@ static bool increment_tag_font(HWND hwnd, struct tag *tag, const int pos, const 
     {
       style |= 2;
     }
-    const int v = choice_by_arrowi(keyCode, -1, 1, 1, -1);
+    const int v = choice_by_arrow_up_downi(keyCode, 1, -1, 1, -1);
     if (!v)
     {
       return false;
@@ -605,7 +599,7 @@ static bool increment_tag_font(HWND hwnd, struct tag *tag, const int pos, const 
 static bool increment_tag_speed(struct tag *tag, const int pos, const int keyCode)
 {
   (void)pos;
-  const float v = choice_by_arrowf(keyCode, -1.f, 1.f, 0.1f, -0.1f);
+  const float v = choice_by_arrow_up_downf(keyCode, 0.1f, -0.1f, 1.f, -1.f);
   if (v == 0.f)
   {
     return false;
@@ -617,7 +611,7 @@ static bool increment_tag_speed(struct tag *tag, const int pos, const int keyCod
 static bool increment_tag_wait(struct tag *tag, const int pos, const int keyCode)
 {
   (void)pos;
-  const float v = choice_by_arrowf(keyCode, -1.f, 1.f, 0.1f, -0.1f);
+  const float v = choice_by_arrow_up_downf(keyCode, 0.1f, -0.1f, 1.f, -1.f);
   if (v == 0.f)
   {
     return false;
@@ -629,7 +623,7 @@ static bool increment_tag_wait(struct tag *tag, const int pos, const int keyCode
 static bool increment_tag_clear(struct tag *tag, const int pos, const int keyCode)
 {
   (void)pos;
-  const float v = choice_by_arrowf(keyCode, -1.f, 1.f, 0.1f, -0.1f);
+  const float v = choice_by_arrow_up_downf(keyCode, 0.1f, -0.1f, 1.f, -1.f);
   if (v == 0.f)
   {
     return false;
