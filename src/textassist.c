@@ -812,8 +812,16 @@ static bool insert_tag(HWND hwnd)
 {
   DWORD caret_start = 0, caret_end = 0;
   SendMessageW(hwnd, EM_GETSEL, (WPARAM)&caret_start, (LPARAM)&caret_end);
-  DWORD r = SendMessageW(hwnd, EM_POSFROMCHAR, (WPARAM)caret_start, 0);
+  DWORD r = SendMessageW(hwnd, EM_POSFROMCHAR, (WPARAM)caret_end, 0);
   POINT pt = {LOWORD(r), HIWORD(r)};
+  if (r == 0xffffffff) {
+    // Move the caret to the end of the selection
+    SendMessageW(hwnd, EM_SETSEL, (WPARAM)caret_start, (LPARAM)caret_end);
+    if (!GetCaretPos(&pt)) {
+      odshr(HRESULT_FROM_WIN32(GetLastError()), L"GetCaretPos failed");
+      return false;
+    }
+  }
   if (!ClientToScreen(hwnd, &pt)) {
     odshr(HRESULT_FROM_WIN32(GetLastError()), L"ClientToScreen failed");
     return false;
