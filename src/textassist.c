@@ -977,6 +977,61 @@ static bool support_input(HWND hwnd, WPARAM keyCode)
 
   // ods("tag type:%d pos:%d len:%d v0:%d %d v1:%d %d v2:%d %d", tag.type, tag.pos, tag.len, tag.value_pos[0], tag.value_len[0], tag.value_pos[1], tag.value_len[1], tag.value_pos[2], tag.value_len[2]);
 
+  if ((keyCode == VK_LEFT || keyCode == VK_RIGHT) && tag.type != tag_type_position) {
+    const int idx = get_caret_tag_value_index(&tag, caret_start);
+    if (idx == -1) {
+      goto failed;
+    }
+    int newpos = -1;
+    if (tag.type != tag_type_color) {
+      const int newidx = saturatei(idx + (keyCode == VK_LEFT ? -1 : 1), 0, 2);
+      if (tag.value_pos[newidx] == -1) {
+        goto failed;
+      }
+      newpos = tag.value_pos[newidx]+tag.value_len[newidx];
+    } else {
+      int colorpos = caret_start - tag.value_pos[idx];
+      int newidx = idx;
+      int newcolorpos = colorpos;
+      if (keyCode == VK_LEFT) {
+        switch(colorpos) {
+          case 0: case 1:
+            --newidx;
+            newcolorpos = 5;
+            break;
+          case 3:
+            newcolorpos = 1;
+            break;
+          case 5: case 6:
+            newcolorpos = 3;
+            break;
+        }
+      }
+      else
+      {
+        switch(colorpos) {
+          case 0: case 1:
+            newcolorpos = 3;
+            break;
+          case 3:
+            newcolorpos = 5;
+            break;
+          case 5: case 6:
+            ++newidx;
+            newcolorpos = 1;
+            break;
+        }
+      }
+      if (newidx == -1 || newidx == 2 || tag.value_pos[newidx] == -1 || tag.value_len[newidx] != 6) {
+        goto failed;
+      }
+      newpos = tag.value_pos[newidx] + newcolorpos;
+    }
+    SendMessageW(hwnd, EM_SETSEL, (WPARAM)newpos, (LPARAM)newpos);
+    free(str);
+    return false;
+  }
+
   if (!increment_tag(hwnd, &tag, caret_start, keyCode))
   {
     goto failed; // no change
@@ -999,8 +1054,24 @@ static bool support_input(HWND hwnd, WPARAM keyCode)
     odshr(HRESULT_FROM_WIN32(GetLastError()), L"SetWindowText failed");
     goto failed;
   }
-  const int pos = tag.type != tag_type_color && tag.len != newlen ? tag.pos + saturatei(newlen - 1, 0, INT_MAX) : (int)caret_start;
-  SendMessageW(hwnd, EM_SETSEL, (WPARAM)pos, (LPARAM)pos);
+
+  // re-parse to calculate new caret position
+  int newpos = (int)caret_start;
+  if (newlen > 0) {
+    if (tag.type != tag_type_color) {
+      const int oldidx = get_caret_tag_value_index(&tag, caret_start);
+      struct tag newtag = {0};
+      if (!parse_tag(str2, tag.pos + newlen, tag.pos, &newtag))
+      {
+        ods(L"why failed?");
+        goto failed;
+      }
+      newpos = newtag.value_pos[oldidx] + newtag.value_len[oldidx];
+    }
+  } else {
+    newpos = tag.pos;
+  }
+  SendMessageW(hwnd, EM_SETSEL, (WPARAM)newpos, (LPARAM)newpos);
   free(str);
   free(str2);
   return true;
