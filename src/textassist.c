@@ -806,6 +806,7 @@ static bool insert_tag(HWND hwnd)
   if (r == 0xffffffff) {
     // Move the caret to the end of the selection
     SendMessageW(hwnd, EM_SETSEL, (WPARAM)caret_start, (LPARAM)caret_end);
+    SendMessageW(hwnd, EM_SCROLLCARET, 0, 0);
     if (!GetCaretPos(&pt)) {
       odshr(HRESULT_FROM_WIN32(GetLastError()), L"GetCaretPos failed");
       return false;
@@ -922,6 +923,7 @@ static bool insert_tag(HWND hwnd)
   caret_start += l;
   caret_end += l;
   SendMessageW(hwnd, EM_SETSEL, (WPARAM)caret_start, (LPARAM)caret_end);
+  SendMessageW(hwnd, EM_SCROLLCARET, 0, 0);
   free(str2);
   free(str);
   return true;
@@ -1028,6 +1030,7 @@ static bool support_input(HWND hwnd, WPARAM keyCode)
       newpos = tag.value_pos[newidx] + newcolorpos;
     }
     SendMessageW(hwnd, EM_SETSEL, (WPARAM)newpos, (LPARAM)newpos);
+    SendMessageW(hwnd, EM_SCROLLCARET, 0, 0);
     free(str);
     return false;
   }
@@ -1072,6 +1075,7 @@ static bool support_input(HWND hwnd, WPARAM keyCode)
     newpos = tag.pos;
   }
   SendMessageW(hwnd, EM_SETSEL, (WPARAM)newpos, (LPARAM)newpos);
+  SendMessageW(hwnd, EM_SCROLLCARET, 0, 0);
   free(str);
   free(str2);
   return true;
