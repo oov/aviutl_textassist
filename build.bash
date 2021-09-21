@@ -6,7 +6,7 @@ mkdir -p bin
 sed 's/\r$//' README.md | sed 's/$/\r/' > bin/textassist.txt
 
 # update version string
-VERSION='v0.3.1'
+VERSION='v0.3.2'
 GITHASH=`git rev-parse --short HEAD`
 echo -n "$VERSION ( $GITHASH )" > "VERSION"
 cat << EOS | sed 's/\r$//' | sed 's/$/\r/' > 'src/ver.h'
