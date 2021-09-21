@@ -7,6 +7,7 @@ target_sources(aviutl_plugin PRIVATE
   ods.c
 )
 target_link_libraries(aviutl_plugin PRIVATE
+  Comctl32
 )
 
 set(targets aviutl_plugin)

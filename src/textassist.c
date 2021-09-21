@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <wchar.h>
+#include <commctrl.h>
 
 #define TEXTASSIST_NAME_WIDE L"テキスト編集補助"
 
@@ -1093,12 +1094,11 @@ failed:
 }
 
 static HWND g_exedit_window = NULL;
-static WNDPROC g_original_exedit_window_proc = NULL;
-static HWND g_edit_control_window = NULL;
-static WNDPROC g_original_edit_control_window_proc = NULL;
 
-static LRESULT WINAPI subclassed_edit_control_window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+static LRESULT WINAPI subclassed_edit_control_window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, UINT_PTR uid_subclass, DWORD_PTR ref_data)
 {
+  (void)uid_subclass;
+  (void)ref_data;
   switch (message)
   {
   case WM_SYSKEYDOWN:
@@ -1122,36 +1122,37 @@ static LRESULT WINAPI subclassed_edit_control_window_proc(HWND hwnd, UINT messag
     }
     break;
   }
-  return CallWindowProcW(g_original_edit_control_window_proc, hwnd, message, wparam, lparam);
+  return DefSubclassProc(hwnd, message, wparam, lparam);
 }
 
-static LRESULT WINAPI subclassed_exedit_window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+static LRESULT WINAPI subclassed_exedit_window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, UINT_PTR uid_subclass, DWORD_PTR ref_data)
 {
+  (void)uid_subclass;
+  (void)ref_data;
   switch (message)
   {
   case WM_COMMAND:
     switch (HIWORD(wparam))
     {
     case EN_SETFOCUS:
-      if ((GetWindowLongW((HWND)lparam, GWL_STYLE) & ES_MULTILINE) == ES_MULTILINE)
+      if ((GetWindowLongPtrW((HWND)lparam, GWL_STYLE) & ES_MULTILINE) == ES_MULTILINE)
       {
-        g_edit_control_window = (HWND)lparam;
-        g_original_edit_control_window_proc = (WNDPROC)GetWindowLongW(g_edit_control_window, GWLP_WNDPROC);
-        SetWindowLongW((HWND)lparam, GWLP_WNDPROC, (LONG_PTR)subclassed_edit_control_window_proc);
+        if (!SetWindowSubclass((HWND)lparam, subclassed_edit_control_window_proc, (UINT_PTR)&textassist_filter, 0))
+        {
+          ods(L"拡張編集ウィンドウのサブクラス化に失敗しました");
+        }
       }
       break;
     case EN_KILLFOCUS:
-      if ((HWND)lparam == g_edit_control_window)
+      if ((GetWindowLongPtrW((HWND)lparam, GWL_STYLE) & ES_MULTILINE) == ES_MULTILINE)
       {
-        SetWindowLongW(g_edit_control_window, GWLP_WNDPROC, (LONG_PTR)g_original_edit_control_window_proc);
-        g_original_edit_control_window_proc = NULL;
-        g_edit_control_window = NULL;
+        RemoveWindowSubclass((HWND)lparam, subclassed_edit_control_window_proc, (UINT_PTR)&textassist_filter);
       }
       break;
     }
     break;
   }
-  return CallWindowProcW(g_original_exedit_window_proc, hwnd, message, wparam, lparam);
+  return DefSubclassProc(hwnd, message, wparam, lparam);
 }
 
 static void initialize(HWND hwnd, void *editp, FILTER *fp)
@@ -1169,13 +1170,11 @@ static void initialize(HWND hwnd, void *editp, FILTER *fp)
     MessageBoxW(hwnd, L"拡張編集のウィンドウが見つけられませんでした", TEXTASSIST_NAME_WIDE, MB_ICONERROR);
     return;
   }
-  g_original_exedit_window_proc = (WNDPROC)GetWindowLongW(g_exedit_window, GWLP_WNDPROC);
-  if (!g_original_exedit_window_proc)
+  if (!SetWindowSubclass(g_exedit_window, (SUBCLASSPROC)subclassed_exedit_window_proc, (UINT_PTR)&textassist_filter, 0))
   {
     MessageBoxW(hwnd, L"拡張編集ウィンドウのサブクラス化に失敗しました", TEXTASSIST_NAME_WIDE, MB_ICONERROR);
     return;
   }
-  SetWindowLongW(g_exedit_window, GWLP_WNDPROC, (LONG_PTR)subclassed_exedit_window_proc);
 }
 
 static void finalize(HWND hwnd, void *editp, FILTER *fp)
@@ -1185,11 +1184,7 @@ static void finalize(HWND hwnd, void *editp, FILTER *fp)
   (void)fp;
   if (g_exedit_window)
   {
-    if (g_original_exedit_window_proc)
-    {
-      SetWindowLongW(g_exedit_window, GWLP_WNDPROC, (LONG_PTR)g_original_exedit_window_proc);
-    }
-    g_original_exedit_window_proc = NULL;
+    RemoveWindowSubclass(g_exedit_window, subclassed_exedit_window_proc, (UINT_PTR)&textassist_filter);
   }
   g_exedit_window = NULL;
 
