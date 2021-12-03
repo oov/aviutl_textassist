@@ -1,6 +1,2 @@
 .vscode
-src/ver.h
-obj/
-bin/
 build/
-VERSION

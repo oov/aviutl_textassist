@@ -1,7 +1,8 @@
 #include "fontlist.h"
 
-#include "ods.h"
 #include <stdlib.h>
+
+#include "ods.h"
 
 enum
 {

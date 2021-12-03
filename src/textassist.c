@@ -1,13 +1,19 @@
-#include "textassist.h"
-#include "fontlist.h"
-#include "ver.h"
-#include "ods.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <wchar.h>
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include <commctrl.h>
 
+#include "aviutl.h"
+#include "fontlist.h"
+#include "ods.h"
+#include "version.h"
+
+#define TEXTASSIST_NAME "\x83\x65\x83\x4C\x83\x58\x83\x67\x95\xD2\x8F\x57\x95\xE2\x8F\x95"
 #define TEXTASSIST_NAME_WIDE L"テキスト編集補助"
+#define CAPTION (TEXTASSIST_NAME_WIDE VERSION_WIDE)
 
 enum
 {
@@ -1137,7 +1143,7 @@ static LRESULT WINAPI subclassed_exedit_window_proc(HWND hwnd, UINT message, WPA
     case EN_SETFOCUS:
       if ((GetWindowLongPtrW((HWND)lparam, GWL_STYLE) & ES_MULTILINE) == ES_MULTILINE)
       {
-        if (!SetWindowSubclass((HWND)lparam, subclassed_edit_control_window_proc, (UINT_PTR)&textassist_filter, 0))
+        if (!SetWindowSubclass((HWND)lparam, subclassed_edit_control_window_proc, (UINT_PTR)&font_name_list, 0))
         {
           ods(L"拡張編集ウィンドウのサブクラス化に失敗しました");
         }
@@ -1146,7 +1152,7 @@ static LRESULT WINAPI subclassed_exedit_window_proc(HWND hwnd, UINT message, WPA
     case EN_KILLFOCUS:
       if ((GetWindowLongPtrW((HWND)lparam, GWL_STYLE) & ES_MULTILINE) == ES_MULTILINE)
       {
-        RemoveWindowSubclass((HWND)lparam, subclassed_edit_control_window_proc, (UINT_PTR)&textassist_filter);
+        RemoveWindowSubclass((HWND)lparam, subclassed_edit_control_window_proc, (UINT_PTR)&font_name_list);
       }
       break;
     }
@@ -1167,12 +1173,12 @@ static void initialize(HWND hwnd, void *editp, FILTER *fp)
   g_exedit_window = FindWindowW(L"ExtendedFilterClass", NULL);
   if (!g_exedit_window)
   {
-    MessageBoxW(hwnd, L"拡張編集のウィンドウが見つけられませんでした", TEXTASSIST_NAME_WIDE, MB_ICONERROR);
+    MessageBoxW(hwnd, L"拡張編集のウィンドウが見つけられませんでした", CAPTION, MB_ICONERROR);
     return;
   }
-  if (!SetWindowSubclass(g_exedit_window, (SUBCLASSPROC)subclassed_exedit_window_proc, (UINT_PTR)&textassist_filter, 0))
+  if (!SetWindowSubclass(g_exedit_window, (SUBCLASSPROC)subclassed_exedit_window_proc, (UINT_PTR)&font_name_list, 0))
   {
-    MessageBoxW(hwnd, L"拡張編集ウィンドウのサブクラス化に失敗しました", TEXTASSIST_NAME_WIDE, MB_ICONERROR);
+    MessageBoxW(hwnd, L"拡張編集ウィンドウのサブクラス化に失敗しました", CAPTION, MB_ICONERROR);
     return;
   }
 }
@@ -1184,7 +1190,7 @@ static void finalize(HWND hwnd, void *editp, FILTER *fp)
   (void)fp;
   if (g_exedit_window)
   {
-    RemoveWindowSubclass(g_exedit_window, subclassed_exedit_window_proc, (UINT_PTR)&textassist_filter);
+    RemoveWindowSubclass(g_exedit_window, subclassed_exedit_window_proc, (UINT_PTR)&font_name_list);
   }
   g_exedit_window = NULL;
 
@@ -1211,40 +1217,17 @@ BOOL textassist_wndproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, v
   return FALSE;
 }
 
-#define TEXTASSIST_NAME "\x83\x65\x83\x4C\x83\x58\x83\x67\x95\xD2\x8F\x57\x95\xE2\x8F\x95"
-FILTER_DLL textassist_filter = {
-    FILTER_FLAG_ALWAYS_ACTIVE | FILTER_FLAG_EX_INFORMATION | FILTER_FLAG_DISP_FILTER | FILTER_FLAG_WINDOW_SIZE,
-    360 | FILTER_WINDOW_SIZE_CLIENT,
-    360 | FILTER_WINDOW_SIZE_CLIENT,
-    TEXTASSIST_NAME,
-    0,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    textassist_wndproc,
-    NULL,
-    NULL,
-    NULL,
-    0,
-    TEXTASSIST_NAME " " VERSION,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    {0, 0},
+static FILTER_DLL textassist_filter = (FILTER_DLL){
+  .flag = FILTER_FLAG_ALWAYS_ACTIVE | FILTER_FLAG_EX_INFORMATION | FILTER_FLAG_DISP_FILTER | FILTER_FLAG_WINDOW_SIZE,
+  .x = 360 | FILTER_WINDOW_SIZE_CLIENT,
+  .y = 360 | FILTER_WINDOW_SIZE_CLIENT,
+  .name = TEXTASSIST_NAME,
+  .func_WndProc = textassist_wndproc,
+  .information = TEXTASSIST_NAME " " VERSION,
 };
+
+EXTERN_C FILTER_DLL __declspec(dllexport) * *__stdcall GetFilterTableList(void)
+{
+  static FILTER_DLL *filter_list[] = {&textassist_filter, NULL};
+  return (FILTER_DLL **)&filter_list;
+}
