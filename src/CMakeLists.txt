@@ -33,6 +33,7 @@ foreach(target ${targets})
       $<$<CONFIG:Release>:NDEBUG>
   )
   target_compile_options(${target} PRIVATE
+      --rtlib=compiler-rt
       -mstackrealign
       -Wall
       -Wextra
@@ -42,10 +43,11 @@ foreach(target ${targets})
       $<$<CONFIG:Release>:-O2>
   )
   target_link_options(${target} PRIVATE
-      $<$<CONFIG:Release>:-s>
+      --rtlib=compiler-rt
       -Wl,--kill-at
-      -static-libgcc
       -no-pthread
+      -static
+      $<$<CONFIG:Release>:-s>
   )
 
 endforeach(target)
