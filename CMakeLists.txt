@@ -1,11 +1,4 @@
 cmake_minimum_required(VERSION 3.1)
-set(CMAKE_C_COMPILER clang)
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS OFF)
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "")
-  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
-endif()
 project(aviutl_textassist C)
 enable_language(C)
 
