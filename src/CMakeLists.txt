@@ -1,3 +1,9 @@
+find_program(CLANG_FORMAT_EXE clang-format)
+file(GLOB sources "${CMAKE_CURRENT_SOURCE_DIR}/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+add_custom_target(${PROJECT_NAME}_format ALL
+  COMMAND ${CLANG_FORMAT_EXE} -style=file -i ${sources}
+)
+
 add_custom_target(generate_version_h COMMAND
   ${CMAKE_COMMAND}
   -Dlocal_dir="${CMAKE_CURRENT_SOURCE_DIR}"
@@ -20,7 +26,7 @@ target_include_directories(aviutl_plugin BEFORE PRIVATE
 target_link_libraries(aviutl_plugin PRIVATE
   comctl32
 )
-add_dependencies(aviutl_plugin generate_version_h)
+add_dependencies(aviutl_plugin ${PROJECT_NAME}_format generate_version_h)
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/bin/textassist.txt" INPUT "${CMAKE_CURRENT_SOURCE_DIR}/../README.md")
 
 set(targets aviutl_plugin)
@@ -37,13 +43,23 @@ foreach(target ${targets})
       -mstackrealign
       -Wall
       -Wextra
+      -Werror
+      -Weverything
+      -Wshadow
       -Werror=return-type
       -pedantic-errors
+      -Wno-declaration-after-statement
+      -Wno-padded
+      -Wno-used-but-marked-unused
+      -ffunction-sections
+      -fdata-sections
+      -flto
       $<$<CONFIG:Debug>:-O0>
       $<$<CONFIG:Release>:-O2>
   )
   target_link_options(${target} PRIVATE
-      --rtlib=compiler-rt
+      -fuse-ld=lld
+      -Wl,--gc-sections
       -Wl,--kill-at
       -no-pthread
       -static
