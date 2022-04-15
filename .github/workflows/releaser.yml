@@ -23,7 +23,14 @@ jobs:
       - uses: msys2/setup-msys2@v2
         with:
           msystem: ${{ matrix.msystem }}
-          install: git mingw-w64-${{ matrix.arch }}-ninja mingw-w64-${{ matrix.arch }}-clang mingw-w64-${{ matrix.arch }}-compiler-rt mingw-w64-${{ matrix.arch }}-cmake
+          install: >-
+            git
+            mingw-w64-${{ matrix.arch }}-clang
+            mingw-w64-${{ matrix.arch }}-cmake
+            mingw-w64-${{ matrix.arch }}-compiler-rt
+            mingw-w64-${{ matrix.arch }}-lld
+            mingw-w64-${{ matrix.arch }}-ninja
+            mingw-w64-${{ matrix.arch }}-tools
       - name: Build
         shell: msys2 {0}
         run: |
