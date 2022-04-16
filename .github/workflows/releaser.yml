@@ -17,7 +17,7 @@ jobs:
           - msystem: MINGW32
             arch: i686
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
       - uses: msys2/setup-msys2@v2
@@ -30,17 +30,16 @@ jobs:
             mingw-w64-${{ matrix.arch }}-compiler-rt
             mingw-w64-${{ matrix.arch }}-lld
             mingw-w64-${{ matrix.arch }}-ninja
-            mingw-w64-${{ matrix.arch }}-tools
       - name: Build
         shell: msys2 {0}
         run: |
           mkdir build
           cd build
-          rm -rf CMakeCache.txt && cmake -GNinja -DCMAKE_C_COMPILER=clang -DCMAKE_C_STANDARD=11 -DCMAKE_CXX_STANDARD=11 -DCMAKE_C_STANDARD_REQUIRED=ON -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_C_EXTENSIONS=OFF -DCMAKE_CXX_EXTENSIONS=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release .. && cmake --build .
+          rm -rf CMakeCache.txt && cmake -GNinja -DCMAKE_C_COMPILER=clang -DCMAKE_C_STANDARD=11 -DCMAKE_C_STANDARD_REQUIRED=ON -DCMAKE_C_EXTENSIONS=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release .. && cmake --build .
       - name: Upload binaries
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.msystem }}-bin
+          name: bin
           path: |
             build/bin/**/*
   create-release:
@@ -54,7 +53,7 @@ jobs:
         uses: actions/download-artifact@v2
       - name: Zip
         run: |
-          cd MINGW32-bin && zip -r ${{ steps.get_version.outputs.tag }}.zip * && cd ..
+          cd bin && zip -r ../assets.zip * && cd ..
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -65,6 +64,14 @@ jobs:
           release_name: ${{ github.ref }}
           draft: true
           prerelease: false
+          body: |
+            ### ダウンロード
+            
+            - [aviutl_textassist_${{ steps.get_version.outputs.tag }}.zip](https://github.com/oov/aviutl_textassist/releases/download/${{ steps.get_version.outputs.tag }}/aviutl_textassist_${{ steps.get_version.outputs.tag }}.zip)
+            
+            ### 変更点
+            
+            - ＊＊＊＊
       - name: Upload Release Asset
         id: upload-release-asset
         uses: actions/upload-release-asset@v1
@@ -72,6 +79,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./MINGW32-bin/${{ steps.get_version.outputs.tag }}.zip
+          asset_path: ./assets.zip
           asset_name: aviutl_textassist_${{ steps.get_version.outputs.tag }}.zip
           asset_content_type: application/zip
