@@ -485,7 +485,7 @@ static bool increment_tag_font(HWND hwnd, struct tag *tag, int const pos, int co
       if (!v) {
         return false;
       }
-      wcscpy(tag->value.font.name, g_font_name_list.sorted[saturatei(fidx + v, 0, (int)g_font_name_list.num)]);
+      wcscpy(tag->value.font.name, g_font_name_list.sorted[saturatei(fidx + v, 0, (int)g_font_name_list.num - 1)]);
       return true;
     }
 
