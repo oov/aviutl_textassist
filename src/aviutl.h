@@ -12,7 +12,7 @@
 #    pragma GCC diagnostic ignored "-Winvalid-utf8"
 #  endif
 #endif // __GNUC__
-#include "aviutl_sdk/filter.h"
+#include "3rd/aviutl_sdk/filter.h"
 #ifdef __GNUC__
 #  pragma GCC diagnostic pop
 #endif // __GNUC__
