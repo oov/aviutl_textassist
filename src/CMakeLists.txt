@@ -1,8 +1,13 @@
-find_program(CLANG_FORMAT_EXE clang-format)
-file(GLOB sources "${CMAKE_CURRENT_SOURCE_DIR}/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
-add_custom_target(${PROJECT_NAME}_format ALL
-  COMMAND ${CLANG_FORMAT_EXE} -style=file -i ${sources}
-)
+option(FORMAT_SOURCES "execute clang-format" ON)
+
+if(FORMAT_SOURCES)
+  file(GLOB_RECURSE sources LIST_DIRECTORIES false CONFIGURE_DEPENDS "*.h" "*.c")
+  list(FILTER sources EXCLUDE REGEX "${CMAKE_CURRENT_SOURCE_DIR}/aviutl_sdk")
+  find_program(CLANG_FORMAT_EXE clang-format)
+  add_custom_target(${PROJECT_NAME}-format ALL
+    COMMAND ${CLANG_FORMAT_EXE} -style=file -i ${sources}
+  )
+endif()
 
 add_custom_target(generate_version_h COMMAND
   ${CMAKE_COMMAND}
@@ -26,7 +31,7 @@ target_include_directories(aviutl_plugin BEFORE PRIVATE
 target_link_libraries(aviutl_plugin PRIVATE
   comctl32
 )
-add_dependencies(aviutl_plugin ${PROJECT_NAME}_format generate_version_h)
+add_dependencies(aviutl_plugin ${PROJECT_NAME}-format generate_version_h)
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/bin/textassist.txt" INPUT "${CMAKE_CURRENT_SOURCE_DIR}/../README.md")
 
 set(targets aviutl_plugin)
@@ -39,7 +44,6 @@ foreach(target ${targets})
       $<$<CONFIG:Release>:NDEBUG>
   )
   target_compile_options(${target} PRIVATE
-      --rtlib=compiler-rt
       -mstackrealign
       -Wall
       -Wextra
@@ -51,6 +55,7 @@ foreach(target ${targets})
       -Wno-declaration-after-statement
       -Wno-padded
       -Wno-used-but-marked-unused
+      -Wno-unsafe-buffer-usage
       -ffunction-sections
       -fdata-sections
       -flto
@@ -61,7 +66,6 @@ foreach(target ${targets})
       -fuse-ld=lld
       -Wl,--gc-sections
       -Wl,--kill-at
-      -no-pthread
       -static
       $<$<CONFIG:Release>:-s>
   )

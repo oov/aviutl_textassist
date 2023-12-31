@@ -1,7 +1,7 @@
 # Based on
 # https://bravenewmethod.com/2017/07/14/git-revision-as-compiler-definition-in-build-with-cmake/
 # https://github.com/tikonen/blog/tree/master/cmake/git_version
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.20)
 
 find_package(Git REQUIRED)
 execute_process(
