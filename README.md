@@ -107,6 +107,11 @@ R, G, B の各パートの値を増減させられます。
 
 - 初版
 
+Contributors
+------------
+
+- sigma-axis
+
 Credits
 -------
 
