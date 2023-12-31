@@ -983,6 +983,8 @@ static LRESULT WINAPI subclassed_edit_control_window_proc(
         return 0;
       }
     } else if (wparam == 0x54) {
+      MSG msg;
+      while (PeekMessageW(&msg, hwnd, WM_SYSCHAR, WM_SYSCHAR, PM_REMOVE));
       if (insert_tag(hwnd)) {
         UpdateWindow(hwnd);
         SendMessageW(g_exedit_window, WM_COMMAND, (WPARAM)(MAKELONG(GetDlgCtrlID(hwnd), EN_CHANGE)), (LPARAM)hwnd);
