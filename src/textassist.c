@@ -130,9 +130,9 @@ static int sprint_float(wchar_t *const buf, float const v, bool const omit_zero)
       buf[0] = L'\0';
       return 0;
     }
-    return wsprintfW(buf, L"-%d" + (negative ? 0 : 1), i);
+    return wsprintfW(buf, &L"-%d"[negative ? 0 : 1], i);
   }
-  return wsprintfW(buf, L"-%d.%d" + (negative ? 0 : 1), i, f);
+  return wsprintfW(buf, &L"-%d.%d"[negative ? 0 : 1], i, f);
 }
 
 static bool parse_tag(wchar_t const *const str, int const len, int const pos, struct tag *tag) {
