@@ -121,16 +121,18 @@ static int sprint_int(wchar_t *const buf, int const v, bool const omit_zero) {
 }
 
 static int sprint_float(wchar_t *const buf, float const v, bool const omit_zero) {
-  int const i = (int)v;
-  int const f = (int)(v * 10 * (v < 0 ? -1 : 1)) % 10;
+  bool const negative = v < 0;
+  float const V = (negative ? -v : v) + 0.05f;
+  int const i = (int)V;
+  int const f = (int)(V * 10) % 10;
   if (!f) {
     if (omit_zero && !i) {
       buf[0] = L'\0';
       return 0;
     }
-    return wsprintfW(buf, L"%d", i);
+    return wsprintfW(buf, L"-%d" + (negative ? 0 : 1), i);
   }
-  return wsprintfW(buf, L"%d.%d", i, f);
+  return wsprintfW(buf, L"-%d.%d" + (negative ? 0 : 1), i, f);
 }
 
 static bool parse_tag(wchar_t const *const str, int const len, int const pos, struct tag *tag) {
@@ -266,6 +268,7 @@ static bool parse_tag(wchar_t const *const str, int const len, int const pos, st
       switch (token) {
       case 0:
       case 1:
+      case 2:
         if (((str[end] == L'+' || str[end] == L'-') && value_pos[token] != end) && !is_float(str[end], &found_dot)) {
           return false;
         }
@@ -533,7 +536,7 @@ static bool increment_tag_wait(struct tag *tag, int const pos, int const keyCode
   if (v == 0.f) {
     return false;
   }
-  tag->value.speed.v = saturatef(tag->value.wait.v + v, 0, (float)INT_MAX);
+  tag->value.wait.v = saturatef(tag->value.wait.v + v, 0, (float)INT_MAX);
   return true;
 }
 
@@ -543,7 +546,7 @@ static bool increment_tag_clear(struct tag *tag, int const pos, int const keyCod
   if (v == 0.f) {
     return false;
   }
-  tag->value.speed.v = saturatef(tag->value.clear.v + v, 0, (float)INT_MAX);
+  tag->value.clear.v = saturatef(tag->value.clear.v + v, 0, (float)INT_MAX);
   return true;
 }
 
@@ -947,7 +950,12 @@ static bool support_input(HWND hwnd, WPARAM keyCode) {
         ods(L"why failed?");
         goto failed;
       }
-      newpos = newtag.value_pos[oldidx] + newtag.value_len[oldidx];
+      if (oldidx != -1 && newtag.value_pos[oldidx] != -1) {
+        newpos = newtag.value_pos[oldidx] + newtag.value_len[oldidx];
+      }
+      else {
+        newpos = newtag.pos + 1;
+      }
     }
   } else {
     newpos = tag.pos;
