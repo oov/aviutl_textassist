@@ -952,8 +952,7 @@ static bool support_input(HWND hwnd, WPARAM keyCode) {
       }
       if (oldidx != -1 && newtag.value_pos[oldidx] != -1) {
         newpos = newtag.value_pos[oldidx] + newtag.value_len[oldidx];
-      }
-      else {
+      } else {
         newpos = newtag.pos + 1;
       }
     }
