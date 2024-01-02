@@ -995,6 +995,7 @@ static LRESULT WINAPI subclassed_edit_control_window_proc(
     // Process in WM_SYSKEYDOWN cause unintended notification sound.
     // To suppress this, process in WM_SYSCHAR and `return 0` to cancel the default behavior.
     // VK_DOWN and others need processing in WM_SYSKEYDOWN as they don't receive WM_SYSCHAR.
+    // See https://github.com/oov/aviutl_textassist/pull/4.
     if (wparam == 't' || wparam == 'T') {
       if (insert_tag(hwnd)) {
         UpdateWindow(hwnd);
