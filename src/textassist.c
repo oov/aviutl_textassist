@@ -989,12 +989,18 @@ static LRESULT WINAPI subclassed_edit_control_window_proc(
         SendMessageW(g_exedit_window, WM_COMMAND, (WPARAM)(MAKELONG(GetDlgCtrlID(hwnd), EN_CHANGE)), (LPARAM)hwnd);
         return 0;
       }
-    } else if (wparam == 0x54) {
+    }
+    break;
+  case WM_SYSCHAR:
+    // Process in WM_SYSKEYDOWN cause unintended notification sound.
+    // To suppress this, process in WM_SYSCHAR and `return 0` to cancel the default behavior.
+    // VK_DOWN and others need processing in WM_SYSKEYDOWN as they don't receive WM_SYSCHAR.
+    if (wparam == 't' || wparam == 'T') {
       if (insert_tag(hwnd)) {
         UpdateWindow(hwnd);
         SendMessageW(g_exedit_window, WM_COMMAND, (WPARAM)(MAKELONG(GetDlgCtrlID(hwnd), EN_CHANGE)), (LPARAM)hwnd);
-        return 0;
       }
+      return 0;
     }
     break;
   }
