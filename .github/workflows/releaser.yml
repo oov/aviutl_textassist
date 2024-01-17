@@ -10,51 +10,21 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        include:
-          - msystem: CLANG32
-            arch: clang-i686
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
         with:
-          submodules: true
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: ${{ matrix.msystem }}
-          install: >-
-            git
-            mingw-w64-${{ matrix.arch }}-clang
-            mingw-w64-${{ matrix.arch }}-cmake
-            mingw-w64-${{ matrix.arch }}-compiler-rt
-            mingw-w64-${{ matrix.arch }}-lld
-            mingw-w64-${{ matrix.arch }}-ninja
-      - name: Build
-        shell: msys2 {0}
-        run: |
-          mkdir build
-          cd build
-          rm -f release/CmakeCache.txt
-          cmake -S .. -B release --preset release && cmake --build release && ctest --test-dir release --output-on-failure
-      - name: Upload binaries
-        uses: actions/upload-artifact@v2
-        with:
-          name: bin
-          path: |
-            build/release/bin/**/*
-  create-release:
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
+          submodules: recursive
       - name: Get the version
         id: get_version
-        run: echo "tag=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
-      - name: Zip
+        shell: bash
         run: |
-          mkdir -p release && cd bin && zip -r ../release/aviutl_textassist_${{ steps.get_version.outputs.tag }}.zip * && cd ..
+          echo "tag=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+      - name: Build
+        shell: bash
+        run: |
+          bash -x build.bash --skip-tests --zip
+          mv build/Release/dist/Release.zip build/Release/dist/aviutl_textassist_${{ steps.get_version.outputs.tag }}.zip
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1

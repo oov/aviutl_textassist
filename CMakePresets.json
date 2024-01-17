@@ -7,11 +7,11 @@
   },
   "configurePresets": [
     {
-      "name": "release",
+      "name": "default",
       "displayName": "DLL build",
       "description": "DLL build using Ninja generator",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/release",
+      "binaryDir": "${sourceDir}/build/default",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "clang",
