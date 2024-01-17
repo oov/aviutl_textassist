@@ -32,7 +32,7 @@ jobs:
           tag_name: ${{ steps.get_version.outputs.tag }}
           draft: true
           prerelease: false
-          files: release/*
+          files: build/Release/dist/*
           body: |
             ### ダウンロード
             
