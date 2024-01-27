@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.7 2024-01-28
+
+contributed by @sigma-axis.
+
+- `Alt + ↓` や `Alt + ↑` でのフォント名切り替えを直感的になるように改善
+- `Alt + T` を押したときに変な位置にメニューが出ることがあるバグを修正
+
 ## v0.3.6 2024-01-02
 
 contributed by @sigma-axis.
