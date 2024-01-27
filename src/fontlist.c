@@ -348,8 +348,16 @@ static int CALLBACK enum_font_callback(const LOGFONTW *lf, const TEXTMETRICW *tm
   return TRUE;
 }
 
-static int compare_string(const void *n1, const void *n2) {
-  return wcscmp(*(wchar_t const *const *)n1, *(wchar_t const *const *)n2);
+static int compare_string(void const *n1, void const *n2) {
+  // In exedit, CBS_SORT is used to sort the font list.
+  // It seems that CompareString can be used to achieve similar behavior.
+  int const r = CompareStringW(LOCALE_USER_DEFAULT,
+                               SORT_STRINGSORT | LINGUISTIC_IGNORECASE,
+                               *(wchar_t const *const *)n1,
+                               -1,
+                               *(wchar_t const *const *)n2,
+                               -1);
+  return r - 2;
 }
 
 bool font_list_create(struct font_list *fl) {
@@ -441,14 +449,9 @@ int font_list_index_of(struct font_list const *const fl, wchar_t const *const s)
     return -1;
   }
   for (size_t i = 0; i < fl->num; ++i) {
-    int c = wcscmp(s, fl->sorted[i]);
-    if (c > 0) {
-      continue;
-    }
-    if (c == 0) {
+    if (wcscmp(s, fl->sorted[i]) == 0) {
       return (int)i;
     }
-    break;
   }
   return -1;
 }
