@@ -430,9 +430,10 @@ static struct font_list g_font_name_list = {0};
 
 static PCWSTR choice_similar_font(struct font_list *fl, HWND hwnd, PCWSTR s) {
   DWORD caret_start = 0, caret_end = 0;
+  SendMessageW(hwnd, EM_SCROLLCARET, 0, 0);
   SendMessageW(hwnd, EM_GETSEL, (WPARAM)&caret_start, (LPARAM)&caret_end);
   LRESULT r = SendMessageW(hwnd, EM_POSFROMCHAR, (WPARAM)caret_start, 0);
-  POINT pt = {LOWORD(r), HIWORD(r)};
+  POINT pt = {(int)(short)LOWORD(r), (int)(short)HIWORD(r)};
   if (!ClientToScreen(hwnd, &pt)) {
     ods(L"ClientToScreen failed");
     return NULL;
@@ -484,7 +485,7 @@ static bool increment_tag_font(HWND hwnd, struct tag *tag, int const pos, int co
   case 1: {
     int const fidx = font_list_index_of(&g_font_name_list, tag->value.font.name);
     if (fidx != -1) {
-      int const v = choice_by_arrow_up_downi(keyCode, 1, -1, 10, -10);
+      int const v = choice_by_arrow_up_downi(keyCode, -1, 1, -10, 10);
       if (!v) {
         return false;
       }
@@ -500,7 +501,7 @@ static bool increment_tag_font(HWND hwnd, struct tag *tag, int const pos, int co
   }
     return true;
   case 2: {
-    int const v = choice_by_arrow_up_downi(keyCode, 1, -1, 1, -1);
+    int const v = choice_by_arrow_up_downi(keyCode, -1, 1, -1, 1);
     if (!v) {
       return false;
     }
@@ -615,7 +616,7 @@ static int sprint_tag_position(wchar_t *buf, struct tag *tag) {
       buf[0] = L'\0';
       return 0;
     }
-    return wsprintfW(buf, L"<p%s,%s>", x, y, z);
+    return wsprintfW(buf, L"<p%s,%s>", x, y);
   }
   return -1;
 }
@@ -698,9 +699,10 @@ static wchar_t *get_text_from_window(HWND hwnd, int *length) {
 
 static bool insert_tag(HWND hwnd) {
   DWORD caret_start = 0, caret_end = 0;
+  SendMessageW(hwnd, EM_SCROLLCARET, 0, 0);
   SendMessageW(hwnd, EM_GETSEL, (WPARAM)&caret_start, (LPARAM)&caret_end);
   LRESULT r = SendMessageW(hwnd, EM_POSFROMCHAR, (WPARAM)caret_end, 0);
-  POINT pt = {LOWORD(r), HIWORD(r)};
+  POINT pt = {(int)(short)LOWORD(r), (int)(short)HIWORD(r)};
   if ((uint32_t)r == 0xffffffff) {
     // Move the caret to the end of the selection
     SendMessageW(hwnd, EM_SETSEL, (WPARAM)caret_start, (LPARAM)caret_end);
