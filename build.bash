@@ -14,7 +14,7 @@ fi
 
 cd ..
 
-REBUILD=1
+REBUILD=0
 SKIP_TESTS=0
 CREATE_ZIP=0
 CMAKE_BUILD_TYPE=Release
@@ -25,8 +25,8 @@ while [[ $# -gt 0 ]]; do
       CMAKE_BUILD_TYPE=Debug
       shift
       ;;
-    -q|--quick)
-      REBUILD=0
+    -r|--rebuild)
+      REBUILD=1
       shift
       ;;
     -s|--skip-tests)
@@ -49,7 +49,7 @@ done
 
 for arch in i686; do
   destdir="${PWD}/${CMAKE_BUILD_TYPE}/${arch}"
-  if [ "${REBUILD}" -eq 1 ]; then
+  if [ "${REBUILD}" -eq 1 ] || [ ! -e "${destdir}/CMakeCache.txt" ]; then
     rm -rf "${destdir}"
     cmake -S .. -B "${destdir}" --preset default \
       -DFORMAT_SOURCES=ON \
