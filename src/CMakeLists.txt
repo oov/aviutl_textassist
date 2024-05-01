@@ -37,6 +37,7 @@ target_compile_options(textassist_intf INTERFACE
   -Wno-padded
   -Wno-used-but-marked-unused
   -Wno-unsafe-buffer-usage
+  -Wno-switch-default
   -ffunction-sections
   -fdata-sections
   -flto
