@@ -20,12 +20,15 @@
 
 enum {
   tag_type_unknown,
-  tag_type_color,
-  tag_type_position,
-  tag_type_font,
-  tag_type_speed,
-  tag_type_wait,
-  tag_type_clear,
+  tag_type_color,    // <#RRGGBB,RRGGBB>
+  tag_type_position, // <pX,Y,Z>
+  tag_type_font,     // <sSIZE,NAME,STYLE>
+  tag_type_speed,    // <rV>
+  tag_type_wait,     // <wV>
+  tag_type_clear,    // <cV>
+  // PSDToolKit only
+  tag_type_position_relative, // <ppX,Y,Z>
+  tag_type_font_relative,     // <ssSIZE,NAME,STYLE>
 };
 
 struct tag_color {
@@ -139,16 +142,25 @@ static bool parse_tag(wchar_t const *const str, int const len, int const pos, st
   if (len - pos < 3 || str[pos] != L'<') {
     return false;
   }
+  int end = pos + 1;
   int type = tag_type_unknown;
-  switch (str[pos + 1]) {
+  switch (str[end]) {
   case L'#':
     type = tag_type_color;
     break;
   case L'p':
     type = tag_type_position;
+    if (end + 1 < len && str[end + 1] == L'p') {
+      type = tag_type_position_relative;
+      ++end;
+    }
     break;
   case L's':
     type = tag_type_font;
+    if (end + 1 < len && str[end + 1] == L's') {
+      type = tag_type_font_relative;
+      ++end;
+    }
     break;
   case L'r':
     type = tag_type_speed;
@@ -162,9 +174,10 @@ static bool parse_tag(wchar_t const *const str, int const len, int const pos, st
   default:
     return false;
   }
-  int end = pos + 2, token = 0;
+  ++end;
+  int token = 0;
   bool found_dot = false;
-  int value_pos[3] = {pos + 2, -1, -1};
+  int value_pos[3] = {end, -1, -1};
   int value_len[3] = {0, 0, 0};
   for (; end < len; ++end) {
     if (str[end] == L',') {
@@ -178,7 +191,8 @@ static bool parse_tag(wchar_t const *const str, int const len, int const pos, st
       continue;
     }
     // '<' is not allowed in most cases, except for font name.
-    if (str[end] == L'<' && (type != tag_type_font || (type == tag_type_font && token != 1))) {
+    if (str[end] == L'<' && ((type != tag_type_font && type != tag_type_font_relative) ||
+                             ((type == tag_type_font || type == tag_type_font_relative) && token != 1))) {
       return false;
     }
     if (str[end] == L'>') {
@@ -195,11 +209,13 @@ static bool parse_tag(wchar_t const *const str, int const len, int const pos, st
         }
         break;
       case tag_type_position:
+      case tag_type_position_relative:
         if (token == 1) {
           return false;
         }
         break;
       case tag_type_font:
+      case tag_type_font_relative:
         if (value_len[1] > 255) {
           return false; // too long
         }
@@ -219,6 +235,7 @@ static bool parse_tag(wchar_t const *const str, int const len, int const pos, st
         tag->value.color.color[1] = tag->value_len[1] == 0 ? 0 : (uint32_t)wcstol(str + tag->value_pos[1], NULL, 16);
         break;
       case tag_type_position:
+      case tag_type_position_relative:
         tag->value.position.x = tag->value_len[0] == 0 ? 0 : wcstof(str + tag->value_pos[0], NULL);
         tag->value.position.y = tag->value_len[1] == 0 ? 0 : wcstof(str + tag->value_pos[1], NULL);
         tag->value.position.z = tag->value_len[2] == 0 ? 0 : wcstof(str + tag->value_pos[2], NULL);
@@ -227,6 +244,7 @@ static bool parse_tag(wchar_t const *const str, int const len, int const pos, st
         tag->value.position.z_relative = tag->value_len[2] > 0 && has_sign(str[tag->value_pos[2]]);
         break;
       case tag_type_font:
+      case tag_type_font_relative:
         tag->value.font.size = tag->value_len[0] == 0 ? 0 : wcstol(str + tag->value_pos[0], NULL, 10);
         if (tag->value_len[1] > 0) {
           memcpy(tag->value.font.name, str + tag->value_pos[1], sizeof(WCHAR) * (size_t)tag->value_len[1]);
@@ -264,7 +282,7 @@ static bool parse_tag(wchar_t const *const str, int const len, int const pos, st
       default:
         return false;
       }
-    } else if (type == tag_type_position) {
+    } else if (type == tag_type_position || type == tag_type_position_relative) {
       switch (token) {
       case 0:
       case 1:
@@ -276,7 +294,7 @@ static bool parse_tag(wchar_t const *const str, int const len, int const pos, st
       default:
         return false;
       }
-    } else if (type == tag_type_font) {
+    } else if (type == tag_type_font || type == tag_type_font_relative) {
       switch (token) {
       case 0: // size
         if (!is_dec(str[end])) {
@@ -556,8 +574,10 @@ static bool increment_tag(HWND hwnd, struct tag *tag, int const pos, int const k
   case tag_type_color:
     return increment_tag_color(tag, pos, keyCode);
   case tag_type_position:
+  case tag_type_position_relative:
     return increment_tag_position(tag, pos, keyCode);
   case tag_type_font:
+  case tag_type_font_relative:
     return increment_tag_font(hwnd, tag, pos, keyCode);
   case tag_type_speed:
     return increment_tag_speed(tag, pos, keyCode);
@@ -601,6 +621,7 @@ static int sprint_tag_position(wchar_t *buf, struct tag *tag) {
       y + (tag->value.position.y_relative && tag->value.position.y >= 0 ? 1 : 0), tag->value.position.y, false);
   sprint_float(
       z + (tag->value.position.z_relative && tag->value.position.z >= 0 ? 1 : 0), tag->value.position.z, false);
+  wchar_t const *const name = tag->type == tag_type_position ? L"p" : L"pp";
   if (tag->value_pos[2] != -1) {
     if (tag->value.position.x_relative && fcmp(tag->value.position.x, ==, 0, 1e-16f) &&
         tag->value.position.y_relative && fcmp(tag->value.position.y, ==, 0, 1e-16f) &&
@@ -608,7 +629,7 @@ static int sprint_tag_position(wchar_t *buf, struct tag *tag) {
       buf[0] = L'\0';
       return 0;
     }
-    return wsprintfW(buf, L"<p%s,%s,%s>", x, y, z);
+    return wsprintfW(buf, L"<%s%s,%s,%s>", name, x, y, z);
   }
   if (tag->value_pos[1] != -1) {
     if (tag->value.position.x_relative && fcmp(tag->value.position.x, ==, 0, 1e-16f) &&
@@ -616,7 +637,7 @@ static int sprint_tag_position(wchar_t *buf, struct tag *tag) {
       buf[0] = L'\0';
       return 0;
     }
-    return wsprintfW(buf, L"<p%s,%s>", x, y);
+    return wsprintfW(buf, L"<%s%s,%s>", name, x, y);
   }
   return -1;
 }
@@ -632,13 +653,14 @@ static int sprint_tag_font(wchar_t *buf, struct tag *tag) {
   } else if (tag->value.font.italic) {
     wcscat(style, L"I");
   }
+  wchar_t const *const name = tag->type == tag_type_font ? L"s" : L"ss";
   if (tag->value_pos[2] != -1) {
-    return wsprintfW(buf, L"<s%s,%s,%s>", size, tag->value.font.name, style);
+    return wsprintfW(buf, L"<%s%s,%s,%s>", name, size, tag->value.font.name, style);
   }
   if (tag->value_pos[1] != -1) {
-    return wsprintfW(buf, L"<s%s,%s>", size, tag->value.font.name);
+    return wsprintfW(buf, L"<%s%s,%s>", name, size, tag->value.font.name);
   }
-  return wsprintfW(buf, L"<s%s>", size);
+  return wsprintfW(buf, L"<%s%s>", name, size);
 }
 
 static int sprint_tag_speed(wchar_t *buf, struct tag *tag) {
@@ -664,8 +686,10 @@ static int sprint_tag(wchar_t *buf, struct tag *tag) {
   case tag_type_color:
     return sprint_tag_color(buf, tag);
   case tag_type_position:
+  case tag_type_position_relative:
     return sprint_tag_position(buf, tag);
   case tag_type_font:
+  case tag_type_font_relative:
     return sprint_tag_font(buf, tag);
   case tag_type_speed:
     return sprint_tag_speed(buf, tag);
@@ -697,6 +721,12 @@ static wchar_t *get_text_from_window(HWND hwnd, int *length) {
   return str;
 }
 
+static struct settings {
+  wchar_t filepath[MAX_PATH];
+  bool psdtoolkit_installed;
+  bool prefer_pp;
+} g_settings = {0};
+
 static bool insert_tag(HWND hwnd) {
   DWORD caret_start = 0, caret_end = 0;
   SendMessageW(hwnd, EM_SCROLLCARET, 0, 0);
@@ -722,17 +752,31 @@ static bool insert_tag(HWND hwnd) {
     odshr(HRESULT_FROM_WIN32(GetLastError()), L"CreatePopupMenu failed");
     return false;
   }
+
   if (caret_start == caret_end) {
-    AppendMenuW(h, MF_ENABLED | MF_STRING, 1, L"色の変更 <#000000,ffffff>");
-    AppendMenuW(h, MF_ENABLED | MF_STRING, 2, L"フォント <s32,ＭＳ Ｐゴシック,BI>");
-    AppendMenuW(h, MF_ENABLED | MF_STRING, 3, L"座標指定 <p0,0>");
-    AppendMenuW(h, MF_ENABLED | MF_STRING, 4, L"表示速度 <r1>");
-    AppendMenuW(h, MF_ENABLED | MF_STRING, 5, L"表示ウェイト <w1>");
-    AppendMenuW(h, MF_ENABLED | MF_STRING, 6, L"表示クリア <c1>");
+    AppendMenuW(h, MF_ENABLED | MF_STRING, tag_type_color, L"色の変更 <#000000,ffffff>");
+    AppendMenuW(h, MF_ENABLED | MF_STRING, tag_type_font, L"フォント <s32,ＭＳ Ｐゴシック,BI>");
+    if (g_settings.psdtoolkit_installed) {
+      AppendMenuW(
+          h, MF_ENABLED | MF_STRING, tag_type_font_relative, L"フォント(PSDToolKit) <ss100,ＭＳ Ｐゴシック,BI>");
+    }
+    AppendMenuW(h, MF_ENABLED | MF_STRING, tag_type_position, L"座標指定 <p0,0>");
+    if (g_settings.psdtoolkit_installed) {
+      AppendMenuW(h, MF_ENABLED | MF_STRING, tag_type_position_relative, L"座標指定(PSDToolKit) <pp+0,+0>");
+    }
+    AppendMenuW(h, MF_ENABLED | MF_STRING, tag_type_speed, L"表示速度 <r1>");
+    AppendMenuW(h, MF_ENABLED | MF_STRING, tag_type_wait, L"表示ウェイト <w1>");
+    AppendMenuW(h, MF_ENABLED | MF_STRING, tag_type_clear, L"表示クリア <c1>");
   } else {
-    AppendMenuW(h, MF_ENABLED | MF_STRING, 1, L"色の変更 <#000000,ffffff> ～ <#>");
-    AppendMenuW(h, MF_ENABLED | MF_STRING, 2, L"フォント <s32,ＭＳ Ｐゴシック,BI> ～ <s>");
-    AppendMenuW(h, MF_ENABLED | MF_STRING, 4, L"表示速度 <r1> ～ <r>");
+    AppendMenuW(h, MF_ENABLED | MF_STRING, tag_type_color, L"色の変更 <#000000,ffffff> ～ <#>");
+    AppendMenuW(h, MF_ENABLED | MF_STRING, tag_type_font, L"フォント <s32,ＭＳ Ｐゴシック,BI> ～ <s>");
+    if (g_settings.psdtoolkit_installed) {
+      AppendMenuW(h,
+                  MF_ENABLED | MF_STRING,
+                  tag_type_font_relative,
+                  L"フォント(PSDToolKit) <ss100,ＭＳ Ｐゴシック,BI> ～ <ss>");
+    }
+    AppendMenuW(h, MF_ENABLED | MF_STRING, tag_type_speed, L"表示速度 <r1> ～ <r>");
   }
 
   int id = TrackPopupMenu(h, TPM_TOPALIGN | TPM_LEFTALIGN | TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
@@ -742,31 +786,40 @@ static bool insert_tag(HWND hwnd) {
   }
   PCWSTR left = NULL, right = NULL;
   switch (id) {
-  case 1:
+  case tag_type_color:
     left = L"<#000000,ffffff>";
     if (caret_start != caret_end) {
       right = L"<#>";
     }
     break;
-  case 2:
+  case tag_type_font:
     left = L"<s32,ＭＳ Ｐゴシック,>";
     if (caret_start != caret_end) {
       right = L"<s>";
     }
     break;
-  case 3:
+  case tag_type_font_relative:
+    left = L"<ss100,ＭＳ Ｐゴシック,>";
+    if (caret_start != caret_end) {
+      right = L"<ss>";
+    }
+    break;
+  case tag_type_position:
     left = L"<p0,0>";
     break;
-  case 4:
+  case tag_type_position_relative:
+    left = L"<pp+0,+0>";
+    break;
+  case tag_type_speed:
     left = L"<r1>";
     if (caret_start != caret_end) {
       right = L"<r>";
     }
     break;
-  case 5:
+  case tag_type_wait:
     left = L"<w1>";
     break;
-  case 6:
+  case tag_type_clear:
     left = L"<c1>";
     break;
   default:
@@ -842,7 +895,11 @@ static bool support_input(HWND hwnd, WPARAM keyCode) {
       // generate relative position tag
       tag.pos = (int)caret_start;
       tag.len = 0;
-      tag.type = tag_type_position;
+      if (g_settings.psdtoolkit_installed && g_settings.prefer_pp) {
+        tag.type = tag_type_position_relative;
+      } else {
+        tag.type = tag_type_position;
+      }
       tag.value_pos[0] = (int)caret_start;
       tag.value_pos[1] = (int)caret_start;
       tag.value_pos[2] = -1;
@@ -863,7 +920,8 @@ static bool support_input(HWND hwnd, WPARAM keyCode) {
   // tag.pos, tag.len, tag.value_pos[0], tag.value_len[0], tag.value_pos[1],
   // tag.value_len[1], tag.value_pos[2], tag.value_len[2]);
 
-  if ((keyCode == VK_LEFT || keyCode == VK_RIGHT) && tag.type != tag_type_position) {
+  if ((keyCode == VK_LEFT || keyCode == VK_RIGHT) && tag.type != tag_type_position &&
+      tag.type != tag_type_position_relative) {
     int const idx = get_caret_tag_value_index(&tag, (int)caret_start);
     if (idx == -1) {
       goto failed;
@@ -1067,27 +1125,100 @@ static void finalize(HWND hwnd, void *editp, FILTER *fp) {
   font_list_destroy(&g_font_name_list);
 }
 
+static bool find_psdtoolkit(FILTER *fp) {
+  SYS_INFO si = {0};
+  if (!fp->exfunc->get_sys_info(NULL, &si)) {
+    ods(L"exfunc->get_sys_info failed");
+    return false;
+  }
+  static char const caption[] = "PSDToolKit";
+  for (int i = 0; i < si.filter_n; ++i) {
+    FILTER const *const p = fp->exfunc->get_filterp(i);
+    if (!p || p->dll_hinst == NULL || (p->flag & FILTER_FLAG_AUDIO_FILTER) == FILTER_FLAG_AUDIO_FILTER) {
+      continue;
+    }
+    if (strcmp(p->name, caption) != 0) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
+
+static bool get_setting_file_path(HMODULE h, wchar_t *const path, size_t const size) {
+  wchar_t const extension[] = L".ini";
+  wchar_t module_path[MAX_PATH];
+  if (!GetModuleFileNameW(h, module_path, MAX_PATH)) {
+    odshr(HRESULT_FROM_WIN32(GetLastError()), L"GetModuleFileName failed");
+    return false;
+  }
+  wchar_t *p = wcsrchr(module_path, L'.');
+  if (!p) {
+    ods(L"failed to get module file name");
+    return false;
+  }
+  *p = L'\0';
+  size_t const len = (size_t)(p - module_path) + wcslen(extension) + 1;
+  if (len > size) {
+    ods(L"filename buffer is too small");
+    return false;
+  }
+  wcscpy(path, module_path);
+  wcscat(path, extension);
+  path[len - 1] = L'\0';
+  return true;
+}
+
+enum {
+  ID_CHK_PREFER_PP = 1001,
+};
+
+static HINSTANCE g_hinst = NULL;
+
 static BOOL textassist_wndproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, void *editp, FILTER *fp) {
+  static HWND chk_prefer_pp = NULL;
   (void)wparam;
   (void)lparam;
   switch (message) {
   case WM_FILTER_INIT:
-    CreateWindowExW(0,
-                    L"STATIC",
-                    L"将来的には設定項目が増えるかも……",
-                    WS_CHILD | WS_VISIBLE,
-                    0,
-                    0,
-                    360,
-                    360,
-                    hwnd,
-                    (HMENU)101,
-                    NULL,
-                    NULL);
+    chk_prefer_pp = CreateWindowExW(0,
+                                    L"BUTTON",
+                                    L"Alt+方向キーで <p> より <pp> を優先する（PSDToolKit が存在する場合のみ）",
+                                    WS_CHILD | WS_VISIBLE | BS_CHECKBOX,
+                                    10,
+                                    0,
+                                    480 - 20,
+                                    32,
+                                    hwnd,
+                                    (HMENU)ID_CHK_PREFER_PP,
+                                    NULL,
+                                    NULL);
+    if (!chk_prefer_pp) {
+      odshr(HRESULT_FROM_WIN32(GetLastError()), L"CreateWindowEx failed");
+      break;
+    }
+    SendMessageW(chk_prefer_pp, WM_SETFONT, (WPARAM)(GetStockObject(DEFAULT_GUI_FONT)), MAKELPARAM(TRUE, 0));
+    if (get_setting_file_path(
+            g_hinst, g_settings.filepath, sizeof(g_settings.filepath) / sizeof(g_settings.filepath[0]))) {
+      g_settings.psdtoolkit_installed = find_psdtoolkit(fp);
+      g_settings.prefer_pp = GetPrivateProfileIntW(L"config", L"prefer_pp", 0, g_settings.filepath) != 0;
+      SendMessageW(chk_prefer_pp, BM_SETCHECK, g_settings.prefer_pp ? BST_CHECKED : BST_UNCHECKED, 0);
+    }
     PostMessageW(hwnd, WM_APP + 1, 0, 0);
     break;
   case WM_FILTER_EXIT:
     finalize(hwnd, editp, fp);
+    break;
+  case WM_COMMAND:
+    switch (LOWORD(wparam)) {
+    case ID_CHK_PREFER_PP:
+      if (g_settings.filepath[0] != L'\0') {
+        g_settings.prefer_pp = SendMessageW(chk_prefer_pp, BM_GETCHECK, 0, 0) != BST_CHECKED;
+        SendMessageW(chk_prefer_pp, BM_SETCHECK, g_settings.prefer_pp ? BST_CHECKED : BST_UNCHECKED, 0);
+        WritePrivateProfileStringW(L"config", L"prefer_pp", g_settings.prefer_pp ? L"1" : L"0", g_settings.filepath);
+      }
+      break;
+    }
     break;
   case WM_APP + 1:
     initialize(hwnd, editp, fp);
@@ -1101,12 +1232,32 @@ EXTERN_C FILTER_DLL __declspec(dllexport) * *__stdcall GetFilterTableList(void) 
   static FILTER_DLL textassist_filter = (FILTER_DLL){
       .flag =
           FILTER_FLAG_ALWAYS_ACTIVE | FILTER_FLAG_EX_INFORMATION | FILTER_FLAG_DISP_FILTER | FILTER_FLAG_WINDOW_SIZE,
-      .x = 360 | FILTER_WINDOW_SIZE_CLIENT,
-      .y = 360 | FILTER_WINDOW_SIZE_CLIENT,
+      .x = 480 | FILTER_WINDOW_SIZE_CLIENT,
+      .y = 32 | FILTER_WINDOW_SIZE_CLIENT,
       .name = TEXTASSIST_NAME,
       .func_WndProc = textassist_wndproc,
       .information = TEXTASSIST_NAME " " VERSION,
   };
   static FILTER_DLL *filter_list[] = {&textassist_filter, NULL};
   return (FILTER_DLL **)&filter_list;
+}
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved);
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
+  (void)lpvReserved;
+  switch (fdwReason) {
+  case DLL_PROCESS_ATTACH:
+    g_hinst = hinstDLL;
+    break;
+
+  case DLL_PROCESS_DETACH:
+    break;
+
+  case DLL_THREAD_ATTACH:
+    break;
+
+  case DLL_THREAD_DETACH:
+    break;
+  }
+  return TRUE;
 }

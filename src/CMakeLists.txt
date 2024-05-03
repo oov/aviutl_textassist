@@ -61,7 +61,6 @@ target_link_libraries(textassist_intf INTERFACE
 add_library(textassist SHARED)
 set_target_properties(textassist PROPERTIES OUTPUT_NAME "textassist.auf" PREFIX "" SUFFIX "" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 target_sources(textassist PRIVATE
-  main.c
   fontlist.c
   textassist.c
   ods.c
