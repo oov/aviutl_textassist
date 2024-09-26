@@ -1,6 +1,18 @@
 #include "textassist.c"
 
+#ifdef __GNUC__
+#  ifndef __has_warning
+#    define __has_warning(x) 0
+#  endif
+#  pragma GCC diagnostic push
+#  if __has_warning("-Wformat")
+#    pragma GCC diagnostic ignored "-Wformat"
+#  endif
+#endif // __GNUC__
 #include "acutest.h"
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
+#endif // __GNUC__
 
 static void test_sprint_float(void) {
   struct {
@@ -18,7 +30,7 @@ static void test_sprint_float(void) {
   };
   wchar_t buf[64];
   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
-    TEST_CASE_("#%d %ls", i, cases[i].expected);
+    TEST_CASE_("#%zu %ls", i, cases[i].expected);
     sprint_float(buf, cases[i].input, cases[i].omit_zero);
     TEST_CHECK(wcscmp(buf, cases[i].expected) == 0);
     TEST_MSG("expected: %ls, got: %ls", cases[i].expected, buf);
@@ -42,7 +54,7 @@ static void test_parse_tag_position(void) {
   };
   struct tag t;
   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
-    TEST_CASE_("#%d %ls", i, cases[i].input);
+    TEST_CASE_("#%zu %ls", i, cases[i].input);
     bool const r = parse_tag(cases[i].input, (int)(wcslen(cases[i].input)), 0, &t);
     TEST_CHECK(r == cases[i].result);
     if (r) {
